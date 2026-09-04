@@ -27,13 +27,13 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Copy `.env.example` to `.env.local` (gitignored).
 
-| Variable | Notes |
-| --- | --- |
-| `API_PROVIDER` | `mock` (default) or `supabase` |
-| `DEMO_USER_EMAIL` | Mock only. Seeds a demo login when both demo values are set. |
-| `DEMO_USER_PASSWORD` | Mock only. Local only. Never commit this. |
-| `SUPABASE_URL` | Required when `API_PROVIDER=supabase`. Server only. |
-| `SUPABASE_ANON_KEY` | Required when `API_PROVIDER=supabase`. Server only. |
+| Variable             | Notes                                                        |
+| -------------------- | ------------------------------------------------------------ |
+| `API_PROVIDER`       | `mock` (default) or `supabase`                               |
+| `DEMO_USER_EMAIL`    | Mock only. Seeds a demo login when both demo values are set. |
+| `DEMO_USER_PASSWORD` | Mock only. Local only. Never commit this.                    |
+| `SUPABASE_URL`       | Required when `API_PROVIDER=supabase`. Server only.          |
+| `SUPABASE_ANON_KEY`  | Required when `API_PROVIDER=supabase`. Server only.          |
 
 With `mock`, register a new account to get the sample portfolio.
 
@@ -46,6 +46,7 @@ With `supabase`, create a project, run `supabase/schema.sql` then `supabase/seed
 - Add mutual funds, ETFs, and direct stocks
 - Open look-through holdings and company drill-down
 - Inspect fund overlap and data-source refresh
+- Paste a public URL on Data sources to extract title and text
 - Switch display currency (INR / USD) and theme (light / dark / black)
 
 ## Project layout

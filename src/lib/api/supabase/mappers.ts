@@ -6,6 +6,7 @@ import type {
   InvestmentTransaction,
   ScrapingLog,
   Security,
+  UrlExtractionRecord,
   User,
 } from "@/lib/api/types";
 import type { Database } from "@/lib/supabase/database.types";
@@ -108,6 +109,21 @@ export function mapLog(row: Tables["scraping_logs"]["Row"]): ScrapingLog {
     status: row.status,
     recordsProcessed: row.records_processed,
     errorMessage: row.error_message ?? undefined,
+  };
+}
+
+export function mapUrlExtraction(row: Tables["url_extractions"]["Row"]): UrlExtractionRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    url: row.url,
+    finalUrl: row.final_url,
+    title: row.title,
+    description: row.description,
+    text: row.content_text,
+    contentType: row.content_type,
+    statusCode: row.status_code,
+    extractedAt: row.extracted_at,
   };
 }
 

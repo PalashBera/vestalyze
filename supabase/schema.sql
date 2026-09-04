@@ -171,6 +171,22 @@ create table if not exists public.fx_rates (
   primary key (base, quote)
 );
 
+create table if not exists public.url_extractions (
+  id text primary key default gen_random_uuid()::text,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  url text not null check (char_length(url) between 8 and 2048),
+  final_url text not null,
+  title text not null default '',
+  description text not null default '',
+  content_text text not null default '',
+  content_type text not null default '',
+  status_code integer not null,
+  extracted_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists url_extractions_user_idx
+  on public.url_extractions (user_id, extracted_at desc);
+
 -- ---------------------------------------------------------------------------
 -- Profile trigger
 -- ---------------------------------------------------------------------------
@@ -195,6 +211,10 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+revoke all on function public.handle_new_user() from public;
+revoke all on function public.handle_new_user() from anon;
+revoke all on function public.handle_new_user() from authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Sample portfolio for a newly registered user
@@ -246,6 +266,7 @@ alter table public.investment_transactions enable row level security;
 alter table public.data_sources enable row level security;
 alter table public.scraping_logs enable row level security;
 alter table public.fx_rates enable row level security;
+alter table public.url_extractions enable row level security;
 
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles
@@ -330,3 +351,11 @@ create policy "logs_insert" on public.scraping_logs
 drop policy if exists "fx_select" on public.fx_rates;
 create policy "fx_select" on public.fx_rates
   for select to authenticated using (true);
+
+drop policy if exists "url_extractions_select_own" on public.url_extractions;
+create policy "url_extractions_select_own" on public.url_extractions
+  for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists "url_extractions_insert_own" on public.url_extractions;
+create policy "url_extractions_insert_own" on public.url_extractions
+  for insert to authenticated with check (user_id = auth.uid());

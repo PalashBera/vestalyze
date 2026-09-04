@@ -9,6 +9,7 @@ import type {
   User,
 } from "@/lib/api/types";
 import { createId, ensureDemoUser, getStore, publicCatalog } from "@/lib/api/mock/store";
+import { extractPublicUrl } from "@/lib/extract/url";
 import { hashPassword, isValidEmail, isValidPassword, verifyPassword } from "@/lib/auth/password";
 import { createSessionId, hashUserAgent } from "@/lib/auth/session";
 import {
@@ -422,4 +423,26 @@ export async function mockUpdateSettings(userId: string, displayCurrency: "INR" 
 
 export function mockFxRate() {
   return getFxRate();
+}
+
+export async function mockExtractUrl(userId: string, rawUrl: string) {
+  const extracted = await extractPublicUrl(rawUrl);
+  const record = {
+    id: createId("ext"),
+    userId,
+    url: extracted.url,
+    finalUrl: extracted.finalUrl,
+    title: extracted.title,
+    description: extracted.description,
+    text: extracted.text,
+    contentType: extracted.contentType,
+    statusCode: extracted.statusCode,
+    extractedAt: extracted.extractedAt,
+  };
+  getStore().urlExtractions.unshift(record);
+  return record;
+}
+
+export function mockListExtractions(userId: string) {
+  return getStore().urlExtractions.filter((item) => item.userId === userId).slice(0, 20);
 }

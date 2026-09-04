@@ -12,6 +12,7 @@ import type {
   PortfolioOverview,
   ScrapingLog,
   Security,
+  UrlExtractionRecord,
   StockExposure,
   User,
   UserSettings,
@@ -102,6 +103,12 @@ export const api = {
     refreshSource: (id: string) =>
       request<DataSource>(`/data-sources/${id}/refresh`, { method: "POST" }),
     logs: () => request<{ logs: ScrapingLog[] }>("/scraping-logs"),
+    extract: (url: string) =>
+      request<{ extraction: UrlExtractionRecord }>("/extract", {
+        method: "POST",
+        body: JSON.stringify({ url }),
+      }),
+    extractions: () => request<{ extractions: UrlExtractionRecord[] }>("/extract"),
   },
   settings: {
     get: () => request<UserSettings>("/settings"),

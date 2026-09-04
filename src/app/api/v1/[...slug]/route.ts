@@ -7,6 +7,7 @@ import {
   mockCreateTransaction,
   mockDataSources,
   mockDeleteInvestment,
+  mockExtractUrl,
   mockDeleteTransaction,
   mockExposure,
   mockExposureDetail,
@@ -15,6 +16,7 @@ import {
   mockGetInvestment,
   mockGetSecurity,
   mockGetSettings,
+  mockListExtractions,
   mockListFunds,
   mockListInvestments,
   mockListSecurities,
@@ -37,6 +39,7 @@ import {
   supabaseCreateTransaction,
   supabaseDataSources,
   supabaseDeleteInvestment,
+  supabaseExtractUrl,
   supabaseDeleteTransaction,
   supabaseExposure,
   supabaseExposureDetail,
@@ -45,6 +48,7 @@ import {
   supabaseGetInvestment,
   supabaseGetSecurity,
   supabaseGetSettings,
+  supabaseListExtractions,
   supabaseListFunds,
   supabaseListInvestments,
   supabaseListSecurities,
@@ -61,7 +65,7 @@ import {
   supabaseUpdateInvestment,
   supabaseUpdateSettings,
 } from "@/lib/api/supabase/handlers";
-import { consumeAuthAttempt } from "@/lib/auth/rate-limit";
+import { consumeAuthAttempt, consumeExtractAttempt } from "@/lib/auth/rate-limit";
 import {
   clearSessionCookie,
   getSessionIdFromCookie,
@@ -272,6 +276,23 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
   if (path === "portfolio/overlap" && method === "GET") {
     return jsonOk({
       overlaps: useSupabase ? await supabaseOverlap(userId) : mockOverlap(userId),
+    });
+  }
+
+  if (path === "extract" && method === "POST") {
+    const limit = consumeExtractAttempt(`extract:${clientKey(request)}`);
+    if (!limit.allowed) {
+      return jsonError("Too many extract attempts. Try again later.", 429);
+    }
+    const body = (await request.json()) as { url?: string };
+    const extraction = useSupabase
+      ? await supabaseExtractUrl(userId, body.url ?? "")
+      : await mockExtractUrl(userId, body.url ?? "");
+    return jsonOk({ extraction }, { status: 201 });
+  }
+  if (path === "extract" && method === "GET") {
+    return jsonOk({
+      extractions: useSupabase ? await supabaseListExtractions(userId) : mockListExtractions(userId),
     });
   }
 

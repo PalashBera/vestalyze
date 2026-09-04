@@ -76,6 +76,7 @@ New users do **not** get rows from `seed.sql`. After register, Next.js calls `cl
 | `investment_transactions` | Lots                                | Via parent investment ownership             |
 | `data_sources`            | Scraper registry                    | Authenticated read/update                   |
 | `scraping_logs`           | Job history                         | Authenticated read/insert                   |
+| `url_extractions`         | Raw page text from a pasted URL     | Own rows only                               |
 | `fx_rates`                | USD/INR                             | Authenticated read                          |
 
 `profiles.id` references `auth.users(id)`. A trigger `handle_new_user` inserts a profile from `raw_user_meta_data.name` on signup.
@@ -117,6 +118,8 @@ Same paths as the mock API. When `API_PROVIDER=supabase`, handlers in `src/lib/a
 | GET              | `/portfolio/*`                                | Load investments + holdings, then `src/lib/finance` |
 | GET/POST         | `/data-sources`, `/data-sources/:id/refresh`  | Registry + log insert                               |
 | GET              | `/scraping-logs`                              | Recent jobs                                         |
+| POST             | `/extract`                                    | Fetch a public URL, store row in `url_extractions`  |
+| GET              | `/extract`                                    | Recent extractions for the signed-in user           |
 | GET/PATCH        | `/settings`                                   | `profiles.display_currency`                         |
 | GET              | `/fx/rate`                                    | `fx_rates`                                          |
 
@@ -130,10 +133,28 @@ Combine the same company across funds, ETFs, and direct stocks.
 
 ---
 
-## 7. How to switch
+## 7. URL extraction
 
-1. Create the project and disable confirm-email for local testing.
-2. Run `schema.sql` then `seed.sql`.
+Yes — scraping can use Supabase. This first pass only extracts title, description, and text from a random public URL. Holdings parsers come later.
+
+How it works:
+
+1. The signed-in user posts `{ "url": "https://..." }` to `/api/v1/extract`.
+2. Next.js validates the URL (http/https only, no credentials, no private/localhost hosts after DNS).
+3. It fetches the page with a timeout and size cap, then strips scripts/styles to plain text.
+4. The row is stored in `url_extractions` under RLS (`user_id = auth.uid()`).
+5. `extract-url` is also deployed as a JWT-protected Edge Function for later crawl jobs. The app path does not need it yet.
+
+Blocked by design: `file://`, `gopher://`, localhost, link-local, private RFC1918 ranges, and oversized/non-text responses.
+
+Use **Data sources → Extract a URL** to try it.
+
+---
+
+## 8. How to switch
+
+1. Create the project and disable confirm-email for local testing (Authentication → Providers → Email).
+2. Run `schema.sql` then `seed.sql` (already applied on project `yqpigjistuentvbvlabd` via MCP).
 3. Put `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `.env.local`.
 4. Set `API_PROVIDER=supabase`.
 5. Restart `npm run dev`.
@@ -143,7 +164,7 @@ To go back to the in-memory API: `API_PROVIDER=mock`.
 
 ---
 
-## 8. Production checklist
+## 9. Production checklist
 
 - Turn on email confirmation (or add a stronger factor).
 - Set Site URL and redirect URLs to the real HTTPS origin.
@@ -155,12 +176,13 @@ To go back to the in-memory API: `API_PROVIDER=mock`.
 
 ---
 
-## 9. Files
+## 10. Files
 
 ```text
 docs/SUPABASE.md                 This guide
 supabase/schema.sql              Tables, RLS, trigger, clone function
 supabase/seed.sql                Catalog + FX
+supabase/functions/extract-url   Optional Edge Function for later crawl jobs
 src/lib/supabase/server.ts       Cookie SSR client
 src/lib/supabase/database.types.ts
 src/lib/api/supabase/handlers.ts Data + auth

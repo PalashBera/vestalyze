@@ -5,9 +5,13 @@ type Bucket = {
 
 const buckets = new Map<string, Bucket>();
 const WINDOW_MS = 15 * 60 * 1000;
-const MAX_ATTEMPTS = 8;
+const MAX_AUTH_ATTEMPTS = 8;
+const MAX_EXTRACT_ATTEMPTS = 20;
 
-export function consumeAuthAttempt(key: string): { allowed: boolean; retryAfterSeconds: number } {
+function consumeAttempt(
+  key: string,
+  maxAttempts: number,
+): { allowed: boolean; retryAfterSeconds: number } {
   const now = Date.now();
   const existing = buckets.get(key);
 
@@ -16,7 +20,7 @@ export function consumeAuthAttempt(key: string): { allowed: boolean; retryAfterS
     return { allowed: true, retryAfterSeconds: 0 };
   }
 
-  if (existing.count >= MAX_ATTEMPTS) {
+  if (existing.count >= maxAttempts) {
     return {
       allowed: false,
       retryAfterSeconds: Math.ceil((existing.resetAt - now) / 1000),
@@ -25,4 +29,12 @@ export function consumeAuthAttempt(key: string): { allowed: boolean; retryAfterS
 
   existing.count += 1;
   return { allowed: true, retryAfterSeconds: 0 };
+}
+
+export function consumeAuthAttempt(key: string): { allowed: boolean; retryAfterSeconds: number } {
+  return consumeAttempt(key, MAX_AUTH_ATTEMPTS);
+}
+
+export function consumeExtractAttempt(key: string): { allowed: boolean; retryAfterSeconds: number } {
+  return consumeAttempt(key, MAX_EXTRACT_ATTEMPTS);
 }

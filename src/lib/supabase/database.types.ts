@@ -181,6 +181,34 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["fx_rates"]["Row"]>;
         Relationships: [];
       };
+      url_extractions: {
+        Row: {
+          id: string;
+          user_id: string;
+          url: string;
+          final_url: string;
+          title: string;
+          description: string;
+          content_text: string;
+          content_type: string;
+          status_code: number;
+          extracted_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          url: string;
+          final_url: string;
+          title?: string;
+          description?: string;
+          content_text?: string;
+          content_type?: string;
+          status_code: number;
+          extracted_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["url_extractions"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

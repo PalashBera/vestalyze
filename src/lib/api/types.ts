@@ -252,3 +252,16 @@ export interface RefreshResult {
   lastScrapedAt: string;
   message: string;
 }
+
+export interface UrlExtractionRecord {
+  id: string;
+  userId: string;
+  url: string;
+  finalUrl: string;
+  title: string;
+  description: string;
+  text: string;
+  contentType: string;
+  statusCode: number;
+  extractedAt: string;
+}

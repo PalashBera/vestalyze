@@ -24,9 +24,11 @@ import {
   mapLog,
   mapSecurity,
   mapTransaction,
+  mapUrlExtraction,
   mapUser,
   throwQueryError,
 } from "@/lib/api/supabase/mappers";
+import { extractPublicUrl } from "@/lib/extract/url";
 
 const AUTH_ERROR = "Invalid username or password";
 
@@ -524,4 +526,42 @@ export async function supabaseUpdateSettings(userId: string, displayCurrency: Cu
 
 export async function supabaseFxRate() {
   return fxRate();
+}
+
+export async function supabaseExtractUrl(userId: string, rawUrl: string) {
+  const extracted = await extractPublicUrl(rawUrl);
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("url_extractions")
+    .insert({
+      user_id: userId,
+      url: extracted.url,
+      final_url: extracted.finalUrl,
+      title: extracted.title,
+      description: extracted.description,
+      content_text: extracted.text,
+      content_type: extracted.contentType,
+      status_code: extracted.statusCode,
+      extracted_at: extracted.extractedAt,
+    })
+    .select("*")
+    .single();
+  if (error || !data) {
+    throwQueryError("Unable to save extracted content.", 500);
+  }
+  return mapUrlExtraction(data);
+}
+
+export async function supabaseListExtractions(userId: string) {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("url_extractions")
+    .select("*")
+    .eq("user_id", userId)
+    .order("extracted_at", { ascending: false })
+    .limit(20);
+  if (error) {
+    throwQueryError("Unable to load extractions.", 500);
+  }
+  return (data ?? []).map(mapUrlExtraction);
 }

@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { AuthUser, Investment, InvestmentTransaction, Session } from "@/lib/api/types";
+import type {
+  AuthUser,
+  Investment,
+  InvestmentTransaction,
+  Session,
+  UrlExtractionRecord,
+} from "@/lib/api/types";
 import { hashPassword } from "@/lib/auth/password";
 import {
   DEMO_USER_ID,
@@ -18,6 +24,7 @@ type Store = {
   sessions: Map<string, Session>;
   investments: Investment[];
   transactions: InvestmentTransaction[];
+  urlExtractions: UrlExtractionRecord[];
   seeded: boolean;
 };
 
@@ -30,6 +37,7 @@ function createStore(): Store {
     sessions: new Map(),
     investments: structuredClone(seedInvestments),
     transactions: structuredClone(seedTransactions),
+    urlExtractions: [],
     seeded: false,
   };
 }
