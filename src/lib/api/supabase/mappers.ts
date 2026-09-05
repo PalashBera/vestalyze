@@ -1,14 +1,4 @@
-import type {
-  DataSource,
-  Fund,
-  FundHolding,
-  Investment,
-  InvestmentTransaction,
-  ScrapingLog,
-  Security,
-  UrlExtractionRecord,
-  User,
-} from "@/lib/api/types";
+import type { Fund, FundHolding, Investment, Security, User } from "@/lib/api/types";
 import type { Database } from "@/lib/supabase/database.types";
 
 type Tables = Database["public"]["Tables"];
@@ -16,6 +6,7 @@ type Tables = Database["public"]["Tables"];
 export function mapSecurity(row: Tables["securities"]["Row"]): Security {
   return {
     id: row.id,
+    userId: row.user_id,
     companyName: row.company_name,
     standardizedName: row.standardized_name,
     ticker: row.ticker,
@@ -31,6 +22,7 @@ export function mapSecurity(row: Tables["securities"]["Row"]): Security {
 export function mapFund(row: Tables["funds"]["Row"]): Fund {
   return {
     id: row.id,
+    userId: row.user_id,
     name: row.name,
     symbol: row.symbol,
     type: row.type,
@@ -49,12 +41,11 @@ export function mapFund(row: Tables["funds"]["Row"]): Fund {
 export function mapHolding(row: Tables["fund_holdings"]["Row"]): FundHolding {
   return {
     id: row.id,
+    userId: row.user_id,
     fundId: row.fund_id,
     securityId: row.security_id,
     allocationPercentage: Number(row.allocation_percentage),
     holdingDate: row.holding_date,
-    shares: row.shares == null ? undefined : Number(row.shares),
-    marketValue: row.market_value == null ? undefined : Number(row.market_value),
     sourceId: row.source_id,
   };
 }
@@ -70,60 +61,11 @@ export function mapInvestment(row: Tables["investments"]["Row"]): Investment {
     country: row.country,
     currency: row.currency,
     investedAmount: Number(row.invested_amount),
-    currentValue: Number(row.current_value),
     units: row.units == null ? undefined : Number(row.units),
+    sourceUrl: row.source_url ?? undefined,
+    lastSyncedAt: row.last_synced_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
-}
-
-export function mapTransaction(row: Tables["investment_transactions"]["Row"]): InvestmentTransaction {
-  return {
-    id: row.id,
-    investmentId: row.investment_id,
-    transactionDate: row.transaction_date,
-    units: row.units == null ? undefined : Number(row.units),
-    purchasePrice: row.purchase_price == null ? undefined : Number(row.purchase_price),
-    investedAmount: Number(row.invested_amount),
-  };
-}
-
-export function mapDataSource(row: Tables["data_sources"]["Row"]): DataSource {
-  return {
-    id: row.id,
-    name: row.name,
-    url: row.url,
-    type: row.type,
-    lastScrapedAt: row.last_scraped_at,
-    lastSuccessfulAt: row.last_successful_at ?? undefined,
-    status: row.status,
-  };
-}
-
-export function mapLog(row: Tables["scraping_logs"]["Row"]): ScrapingLog {
-  return {
-    id: row.id,
-    dataSourceId: row.data_source_id,
-    startedAt: row.started_at,
-    completedAt: row.completed_at ?? undefined,
-    status: row.status,
-    recordsProcessed: row.records_processed,
-    errorMessage: row.error_message ?? undefined,
-  };
-}
-
-export function mapUrlExtraction(row: Tables["url_extractions"]["Row"]): UrlExtractionRecord {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    url: row.url,
-    finalUrl: row.final_url,
-    title: row.title,
-    description: row.description,
-    text: row.content_text,
-    contentType: row.content_type,
-    statusCode: row.status_code,
-    extractedAt: row.extracted_at,
   };
 }
 
@@ -138,6 +80,18 @@ export function mapUser(
     name: profile.name,
     displayCurrency: profile.display_currency,
     createdAt: profile.created_at,
+  };
+}
+
+export function mapSync(row: Tables["investment_syncs"]["Row"]): import("@/lib/api/types").InvestmentSync {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    investmentId: row.investment_id,
+    startedAt: row.started_at,
+    status: row.status,
+    recordsProcessed: row.records_processed,
+    errorMessage: row.error_message ?? undefined,
   };
 }
 

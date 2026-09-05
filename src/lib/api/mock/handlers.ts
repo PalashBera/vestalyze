@@ -1,15 +1,19 @@
 import type {
   AuthUser,
   CreateInvestmentRequest,
-  CreateTransactionRequest,
+  Fund,
+  FundHolding,
   Investment,
+  InvestmentSync,
   LoginRequest,
   RegisterRequest,
   UpdateInvestmentRequest,
   User,
 } from "@/lib/api/types";
-import { createId, ensureDemoUser, getStore, publicCatalog } from "@/lib/api/mock/store";
-import { extractPublicUrl } from "@/lib/extract/url";
+import { createId, ensureDemoUser, getStore, userCatalog } from "@/lib/api/mock/store";
+import { scrapeFundHoldings } from "@/lib/extract/holdings";
+import { buildSecurityFromCompany, buildSecurityFromInput } from "@/lib/investments/security";
+import { isFundVehicle, normalizeSourceUrl } from "@/lib/investments/fund-url";
 import { hashPassword, isValidEmail, isValidPassword, verifyPassword } from "@/lib/auth/password";
 import { createSessionId, hashUserAgent } from "@/lib/auth/session";
 import {
@@ -18,29 +22,9 @@ import {
   buildOverview,
   calculateExposures,
 } from "@/lib/finance/exposure";
-import { getFxRate } from "@/lib/finance/currency";
+import { FX_AS_OF, FX_USD_INR, getFxRate } from "@/lib/finance/currency";
 
 const AUTH_ERROR = "Invalid username or password";
-
-function cloneDemoPortfolio(userId: string) {
-  const store = getStore();
-  const originals = store.investments.filter((item) => item.userId === "user-demo");
-  for (const item of originals) {
-    const nextId = createId("inv");
-    store.investments.push({
-      ...item,
-      id: nextId,
-      userId,
-    });
-    for (const transaction of store.transactions.filter((row) => row.investmentId === item.id)) {
-      store.transactions.push({
-        ...transaction,
-        id: createId("txn"),
-        investmentId: nextId,
-      });
-    }
-  }
-}
 
 function toPublicUser(user: AuthUser): User {
   return {
@@ -56,13 +40,49 @@ function userInvestments(userId: string): Investment[] {
   return getStore().investments.filter((item) => item.userId === userId);
 }
 
-function catalog() {
-  return publicCatalog();
+function catalog(userId: string) {
+  return userCatalog(userId);
+}
+
+function fxFor(userId: string) {
+  const user = getStore().users.get(userId);
+  return getFxRate(user ? { rate: user.fxUsdInr, asOf: user.fxAsOf } : undefined);
 }
 
 function exposuresFor(userId: string) {
-  const { funds, holdings, securities } = catalog();
-  return calculateExposures(userInvestments(userId), holdings, securities, funds);
+  const { funds, holdings, securities } = catalog(userId);
+  return calculateExposures(userInvestments(userId), holdings, securities, funds, fxFor(userId).rate);
+}
+
+function ensureMockFund(
+  userId: string,
+  input: { name: string; type: "mutual_fund" | "etf"; country: Investment["country"]; currency: Investment["currency"]; sourceUrl: string },
+): Fund {
+  const store = getStore();
+  const existing = store.funds.find((item) => item.userId === userId && item.sourceUrl === input.sourceUrl);
+  if (existing) {
+    existing.name = input.name;
+    return existing;
+  }
+  const now = new Date().toISOString();
+  const fund: Fund = {
+    id: createId("fund"),
+    userId,
+    name: input.name,
+    symbol: input.name.slice(0, 12).toUpperCase(),
+    type: input.type,
+    fundHouse: new URL(input.sourceUrl).hostname,
+    category: "Uncategorized",
+    country: input.country,
+    currency: input.currency,
+    latestPortfolioDate: now.slice(0, 10),
+    sourceWebsite: new URL(input.sourceUrl).hostname,
+    sourceUrl: input.sourceUrl,
+    lastScrapedAt: now,
+    dataStatus: "pending",
+  };
+  store.funds.push(fund);
+  return fund;
 }
 
 export async function mockLogin(input: LoginRequest, userAgent: string | null) {
@@ -111,12 +131,13 @@ export async function mockRegister(input: RegisterRequest, userAgent: string | n
     email,
     name: input.name.trim(),
     displayCurrency: "INR",
+    fxUsdInr: FX_USD_INR,
+    fxAsOf: FX_AS_OF,
     createdAt: new Date().toISOString(),
     passwordHash: await hashPassword(input.password),
   };
   store.users.set(user.id, user);
   store.usersByEmail.set(email, user.id);
-  cloneDemoPortfolio(user.id);
 
   const sessionId = createSessionId();
   store.sessions.set(sessionId, {
@@ -154,7 +175,7 @@ export function mockGetInvestment(userId: string, id: string) {
   if (!investment) {
     throw Object.assign(new Error("Investment not found"), { status: 404 });
   }
-  const { funds, holdings, securities } = catalog();
+  const { funds, holdings, securities } = catalog(userId);
   return {
     investment,
     fund: investment.fundId ? funds.find((item) => item.id === investment.fundId) : undefined,
@@ -169,7 +190,10 @@ export function mockGetInvestment(userId: string, id: string) {
             security: securities.find((security) => security.id === item.securityId),
           }))
       : [],
-    transactions: getStore().transactions.filter((item) => item.investmentId === id),
+    syncs: getStore()
+      .syncs.filter((item) => item.investmentId === id && item.userId === userId)
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+      .slice(0, 20),
   };
 }
 
@@ -187,19 +211,58 @@ export function mockCreateInvestment(userId: string, input: CreateInvestmentRequ
     throw Object.assign(new Error("Invested amount must be greater than zero."), { status: 400 });
   }
 
+  const sourceUrl = normalizeSourceUrl(input.sourceUrl);
+  if (isFundVehicle(input.type) && !sourceUrl) {
+    throw Object.assign(new Error("Fund URL is required for mutual funds and ETFs."), { status: 400 });
+  }
+
   const now = new Date().toISOString();
+  let fundId = input.fundId;
+  if (input.fundId) {
+    const ownedFund = getStore().funds.find((item) => item.id === input.fundId && item.userId === userId);
+    if (!ownedFund) {
+      throw Object.assign(new Error("Fund not found"), { status: 404 });
+    }
+  }
+  if (isFundVehicle(input.type) && sourceUrl) {
+    fundId = ensureMockFund(userId, {
+      name: input.name.trim(),
+      type: input.type,
+      country: input.country,
+      currency: input.currency,
+      sourceUrl,
+    }).id;
+  }
+  const security = buildSecurityFromInput(input, userId);
+  if (security) {
+    const store = getStore();
+    const existing = store.securities.find(
+      (item) =>
+        item.userId === userId && item.ticker === security.ticker && item.country === security.country,
+    );
+    if (existing) {
+      security.id = existing.id;
+    } else {
+      store.securities.push(security);
+    }
+  } else if (input.securityId) {
+    const owned = getStore().securities.find((item) => item.id === input.securityId && item.userId === userId);
+    if (!owned) {
+      throw Object.assign(new Error("Security not found"), { status: 404 });
+    }
+  }
   const investment: Investment = {
     id: createId("inv"),
     userId,
-    fundId: input.fundId,
-    securityId: input.securityId,
+    fundId,
+    securityId: security?.id ?? input.securityId,
     name: input.name.trim(),
     type: input.type,
     country: input.country,
     currency: input.currency,
     investedAmount: input.investedAmount,
-    currentValue: input.currentValue > 0 ? input.currentValue : input.investedAmount,
     units: input.units,
+    sourceUrl: sourceUrl || undefined,
     createdAt: now,
     updatedAt: now,
   };
@@ -222,14 +285,109 @@ export function mockUpdateInvestment(userId: string, id: string, input: UpdateIn
     }
     investment.investedAmount = input.investedAmount;
   }
-  if (input.currentValue !== undefined) {
-    investment.currentValue = input.currentValue;
-  }
   if (input.units !== undefined) {
     investment.units = input.units;
   }
+  if (input.sourceUrl !== undefined) {
+    const sourceUrl = normalizeSourceUrl(input.sourceUrl);
+    if (isFundVehicle(investment.type) && !sourceUrl) {
+      throw Object.assign(new Error("Fund URL is required for mutual funds and ETFs."), { status: 400 });
+    }
+    investment.sourceUrl = sourceUrl || undefined;
+    if (isFundVehicle(investment.type) && sourceUrl) {
+      investment.fundId = ensureMockFund(userId, {
+        name: investment.name,
+        type: investment.type,
+        country: investment.country,
+        currency: investment.currency,
+        sourceUrl,
+      }).id;
+    }
+  }
   investment.updatedAt = new Date().toISOString();
   return investment;
+}
+
+export async function mockSyncInvestment(userId: string, id: string) {
+  const store = getStore();
+  const investment = store.investments.find((item) => item.id === id && item.userId === userId);
+  if (!investment) {
+    throw Object.assign(new Error("Investment not found"), { status: 404 });
+  }
+  if (!isFundVehicle(investment.type)) {
+    throw Object.assign(new Error("Sync is only available for mutual funds and ETFs."), { status: 400 });
+  }
+  const sourceUrl = normalizeSourceUrl(investment.sourceUrl);
+  if (!sourceUrl) {
+    throw Object.assign(new Error("Add a fund URL before syncing holdings."), { status: 400 });
+  }
+
+  const startedAt = new Date().toISOString();
+  const sync: InvestmentSync = {
+    id: createId("sync"),
+    userId,
+    investmentId: id,
+    startedAt,
+    status: "running",
+    recordsProcessed: 0,
+  };
+  store.syncs.unshift(sync);
+
+  try {
+    const scraped = await scrapeFundHoldings(sourceUrl);
+    const fund = ensureMockFund(userId, {
+      name: investment.name,
+      type: investment.type,
+      country: investment.country,
+      currency: investment.currency,
+      sourceUrl,
+    });
+    investment.fundId = fund.id;
+    store.holdings = store.holdings.filter((item) => item.fundId !== fund.id);
+    const holdings: FundHolding[] = scraped.holdings.map((item) => {
+      const security = buildSecurityFromCompany(userId, item.name, investment.country);
+      const existing = store.securities.find(
+        (row) => row.userId === userId && row.ticker === security.ticker && row.country === security.country,
+      );
+      if (existing) {
+        security.id = existing.id;
+      } else {
+        store.securities.push(security);
+      }
+      return {
+        id: createId("hold"),
+        userId,
+        fundId: fund.id,
+        securityId: security.id,
+        allocationPercentage: item.allocationPercentage,
+        holdingDate: scraped.holdingDate,
+        sourceId: "indmoney-holdings",
+      };
+    });
+    store.holdings.push(...holdings);
+    fund.lastScrapedAt = new Date().toISOString();
+    fund.latestPortfolioDate = scraped.holdingDate;
+    fund.dataStatus = "fresh";
+    const completedAt = new Date().toISOString();
+    for (const row of store.investments.filter((item) => item.fundId === fund.id && item.userId === userId)) {
+      row.lastSyncedAt = completedAt;
+    }
+    sync.status = "success";
+    sync.recordsProcessed = holdings.length;
+    return { investment, sync, recordsProcessed: holdings.length };
+  } catch (error) {
+    sync.status = "failed";
+    sync.errorMessage = error instanceof Error ? error.message : "Sync failed";
+    throw error;
+  }
+}
+
+export function mockListSyncs(userId: string, investmentId: string) {
+  mockGetInvestment(userId, investmentId);
+  return getStore()
+    .syncs.filter((item) => item.investmentId === investmentId && item.userId === userId)
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+    .slice(0, 50);
 }
 
 export function mockDeleteInvestment(userId: string, id: string) {
@@ -239,57 +397,16 @@ export function mockDeleteInvestment(userId: string, id: string) {
     throw Object.assign(new Error("Investment not found"), { status: 404 });
   }
   store.investments.splice(index, 1);
-  store.transactions = store.transactions.filter((item) => item.investmentId !== id);
+  store.syncs = store.syncs.filter((item) => item.investmentId !== id);
   return { ok: true };
 }
 
-export function mockCreateTransaction(userId: string, investmentId: string, input: CreateTransactionRequest) {
-  const investment = userInvestments(userId).find((item) => item.id === investmentId);
-  if (!investment) {
-    throw Object.assign(new Error("Investment not found"), { status: 404 });
-  }
-  if (!input.transactionDate || input.investedAmount <= 0) {
-    throw Object.assign(new Error("A valid date and amount are required."), { status: 400 });
-  }
-  const transaction = {
-    id: createId("txn"),
-    investmentId,
-    transactionDate: input.transactionDate,
-    units: input.units,
-    purchasePrice: input.purchasePrice,
-    investedAmount: input.investedAmount,
-  };
-  getStore().transactions.push(transaction);
-  investment.investedAmount += input.investedAmount;
-  if (input.units) {
-    investment.units = (investment.units ?? 0) + input.units;
-  }
-  investment.updatedAt = new Date().toISOString();
-  return transaction;
+export function mockListFunds(userId: string) {
+  return catalog(userId).funds;
 }
 
-export function mockDeleteTransaction(userId: string, id: string) {
-  const store = getStore();
-  const transaction = store.transactions.find((item) => item.id === id);
-  if (!transaction) {
-    throw Object.assign(new Error("Transaction not found"), { status: 404 });
-  }
-  const investment = store.investments.find(
-    (item) => item.id === transaction.investmentId && item.userId === userId,
-  );
-  if (!investment) {
-    throw Object.assign(new Error("Transaction not found"), { status: 404 });
-  }
-  store.transactions = store.transactions.filter((item) => item.id !== id);
-  return { ok: true };
-}
-
-export function mockListFunds() {
-  return catalog().funds;
-}
-
-export function mockGetFund(id: string) {
-  const { funds, holdings, securities } = catalog();
+export function mockGetFund(userId: string, id: string) {
+  const { funds, holdings, securities } = catalog(userId);
   const fund = funds.find((item) => item.id === id);
   if (!fund) {
     throw Object.assign(new Error("Fund not found"), { status: 404 });
@@ -305,26 +422,27 @@ export function mockGetFund(id: string) {
   };
 }
 
-export function mockRefreshFund(id: string) {
-  const fund = catalog().funds.find((item) => item.id === id);
+export function mockRefreshFund(userId: string, id: string) {
+  const { funds, holdings } = catalog(userId);
+  const fund = funds.find((item) => item.id === id);
   if (!fund) {
     throw Object.assign(new Error("Fund not found"), { status: 404 });
   }
   return {
     fundId: id,
     status: "success" as const,
-    recordsProcessed: catalog().holdings.filter((item) => item.fundId === id).length,
+    recordsProcessed: holdings.filter((item) => item.fundId === id).length,
     lastScrapedAt: new Date().toISOString(),
-    message: "Mock refresh completed. Holdings were reloaded from the local catalog.",
+    message: "Holdings refresh completed from your catalog.",
   };
 }
 
-export function mockListSecurities() {
-  return catalog().securities;
+export function mockListSecurities(userId: string) {
+  return catalog(userId).securities;
 }
 
-export function mockGetSecurity(id: string) {
-  const security = catalog().securities.find((item) => item.id === id);
+export function mockGetSecurity(userId: string, id: string) {
+  const security = catalog(userId).securities.find((item) => item.id === id);
   if (!security) {
     throw Object.assign(new Error("Security not found"), { status: 404 });
   }
@@ -332,11 +450,11 @@ export function mockGetSecurity(id: string) {
 }
 
 export function mockOverview(userId: string) {
-  return buildOverview(userInvestments(userId), exposuresFor(userId));
+  return buildOverview(userInvestments(userId), exposuresFor(userId), fxFor(userId));
 }
 
 export function mockMarket(userId: string, country: "IN" | "US") {
-  return buildMarketDashboard(country, userInvestments(userId), exposuresFor(userId));
+  return buildMarketDashboard(country, userInvestments(userId), exposuresFor(userId), fxFor(userId).rate);
 }
 
 export function mockExposure(userId: string) {
@@ -353,22 +471,22 @@ export function mockExposureDetail(userId: string, securityId: string) {
 
 export function mockAllocation(userId: string) {
   const overview = mockOverview(userId);
+  const rate = fxFor(userId).rate;
   return {
     market: overview.marketAllocation,
     type: overview.typeAllocation,
-    sector: overview.sectorAllocation,
     stocks: overview.topHoldings.map((item) => ({
       key: item.security.id,
       label: item.security.standardizedName,
       amountInr: item.totalInvestedInr,
-      amountUsd: item.totalInvestedInr / getFxRate().rate,
+      amountUsd: item.totalInvestedInr / rate,
       percentage: item.portfolioPercentage,
     })),
   };
 }
 
 export function mockOverlap(userId: string) {
-  const { funds, holdings, securities } = catalog();
+  const { funds, holdings, securities } = catalog(userId);
   const overlaps = buildOverlaps(userInvestments(userId), holdings, funds);
   return overlaps.map((item) => ({
     ...item,
@@ -381,27 +499,6 @@ export function mockOverlap(userId: string) {
       };
     }),
   }));
-}
-
-export function mockDataSources() {
-  return catalog().dataSources;
-}
-
-export function mockRefreshSource(id: string) {
-  const source = catalog().dataSources.find((item) => item.id === id);
-  if (!source) {
-    throw Object.assign(new Error("Data source not found"), { status: 404 });
-  }
-  return {
-    ...source,
-    lastScrapedAt: new Date().toISOString(),
-    lastSuccessfulAt: new Date().toISOString(),
-    status: "fresh" as const,
-  };
-}
-
-export function mockScrapingLogs() {
-  return catalog().scrapingLogs;
 }
 
 export async function mockGetSettings(userId: string) {
@@ -421,28 +518,19 @@ export async function mockUpdateSettings(userId: string, displayCurrency: "INR" 
   return { displayCurrency };
 }
 
-export function mockFxRate() {
-  return getFxRate();
+export function mockFxRate(userId: string) {
+  return fxFor(userId);
 }
 
-export async function mockExtractUrl(userId: string, rawUrl: string) {
-  const extracted = await extractPublicUrl(rawUrl);
-  const record = {
-    id: createId("ext"),
-    userId,
-    url: extracted.url,
-    finalUrl: extracted.finalUrl,
-    title: extracted.title,
-    description: extracted.description,
-    text: extracted.text,
-    contentType: extracted.contentType,
-    statusCode: extracted.statusCode,
-    extractedAt: extracted.extractedAt,
-  };
-  getStore().urlExtractions.unshift(record);
-  return record;
-}
-
-export function mockListExtractions(userId: string) {
-  return getStore().urlExtractions.filter((item) => item.userId === userId).slice(0, 20);
+export function mockUpdateFxRate(userId: string, rate: number) {
+  if (!Number.isFinite(rate) || rate <= 0 || rate > 500) {
+    throw Object.assign(new Error("Enter a USD/INR rate between 0 and 500."), { status: 400 });
+  }
+  const user = getStore().users.get(userId);
+  if (!user) {
+    throw Object.assign(new Error("Unauthorized"), { status: 401 });
+  }
+  user.fxUsdInr = rate;
+  user.fxAsOf = new Date().toISOString().slice(0, 10);
+  return fxFor(userId);
 }

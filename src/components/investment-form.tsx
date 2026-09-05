@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { PencilIcon, RefreshCwIcon } from "lucide-react";
 import { api } from "@/lib/api/client";
-import type { Country, CreateInvestmentRequest, Currency, Fund, InvestmentType, Security } from "@/lib/api/types";
+import type { Country, CreateInvestmentRequest, Currency, Investment, InvestmentType } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -37,51 +38,252 @@ const countryItems = [
   { label: "United States", value: "US" },
 ];
 
-export function InvestmentForm({ onCreated }: { onCreated: () => void }) {
+const sectorItems = [
+  { label: "Banking", value: "Banking" },
+  { label: "Technology", value: "Technology" },
+  { label: "Energy", value: "Energy" },
+  { label: "Consumer", value: "Consumer" },
+  { label: "Healthcare", value: "Healthcare" },
+  { label: "Financial Services", value: "Financial Services" },
+  { label: "Industrials", value: "Industrials" },
+  { label: "Uncategorized", value: "Uncategorized" },
+];
+
+export function InvestmentFields({
+  type,
+  country,
+  sector,
+  defaults,
+  lockType = false,
+  onTypeChange,
+  onCountryChange,
+  onSectorChange,
+}: {
+  type: InvestmentType;
+  country: Country;
+  sector: string;
+  defaults?: {
+    name?: string;
+    investedAmount?: number;
+    units?: number;
+    sourceUrl?: string;
+    ticker?: string;
+  };
+  lockType?: boolean;
+  onTypeChange: (type: InvestmentType) => void;
+  onCountryChange: (country: Country) => void;
+  onSectorChange: (sector: string) => void;
+}) {
+  const needsFundUrl = type === "mutual_fund" || type === "etf";
+  return (
+    <FieldGroup>
+      <Field>
+        <FieldLabel htmlFor="name">Name</FieldLabel>
+        <Input
+          id="name"
+          name="name"
+          required
+          maxLength={120}
+          defaultValue={defaults?.name}
+          placeholder="Bandhan Small Cap Fund Direct Growth"
+        />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field>
+          <FieldLabel>Type</FieldLabel>
+          <Select
+            items={typeItems}
+            value={type}
+            disabled={lockType}
+            onValueChange={(value) => onTypeChange(value as InvestmentType)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {typeItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field>
+          <FieldLabel>Country</FieldLabel>
+          <Select
+            items={countryItems}
+            value={country}
+            disabled={lockType}
+            onValueChange={(value) => onCountryChange(value as Country)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {countryItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+      {needsFundUrl ? (
+        <Field>
+          <FieldLabel htmlFor="sourceUrl">Fund URL</FieldLabel>
+          <Input
+            id="sourceUrl"
+            name="sourceUrl"
+            type="url"
+            required
+            defaultValue={defaults?.sourceUrl}
+            placeholder="https://www.indmoney.com/mutual-funds/bandhan-small-cap-fund-direct-growth"
+          />
+          <FieldDescription>
+            Public factsheet used to scrape the stock split from the holdings section.
+          </FieldDescription>
+        </Field>
+      ) : null}
+      {type === "stock" && !lockType ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="ticker">Stock code</FieldLabel>
+            <Input id="ticker" name="ticker" required maxLength={16} defaultValue={defaults?.ticker} placeholder="HDFCBANK" />
+          </Field>
+          <Field>
+            <FieldLabel>Category</FieldLabel>
+            <Select items={sectorItems} value={sector} onValueChange={(value) => onSectorChange(value ?? "Uncategorized")}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {sectorItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+      ) : null}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="investedAmount">Invested</FieldLabel>
+          <Input
+            id="investedAmount"
+            name="investedAmount"
+            type="number"
+            min="1"
+            step="0.01"
+            required
+            defaultValue={defaults?.investedAmount}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="units">Units</FieldLabel>
+          <Input id="units" name="units" type="number" min="0" step="0.001" defaultValue={defaults?.units} />
+        </Field>
+      </div>
+    </FieldGroup>
+  );
+}
+
+export function payloadFromForm(
+  formData: FormData,
+  type: InvestmentType,
+  country: Country,
+  sector: string,
+): CreateInvestmentRequest {
+  return {
+    name: String(formData.get("name") ?? "").trim(),
+    type,
+    country,
+    currency: (country === "IN" ? "INR" : "USD") as Currency,
+    investedAmount: Number(formData.get("investedAmount")),
+    units: formData.get("units") ? Number(formData.get("units")) : undefined,
+    ticker: String(formData.get("ticker") ?? ""),
+    sector,
+    sourceUrl: String(formData.get("sourceUrl") ?? "").trim() || undefined,
+  };
+}
+
+export function SyncInvestmentButton({
+  investment,
+  onSynced,
+  labeled = false,
+}: {
+  investment: Investment;
+  onSynced: () => void | Promise<void>;
+  labeled?: boolean;
+}) {
+  const [pending, setPending] = useState(false);
+  if (investment.type === "stock") {
+    return null;
+  }
+
+  async function sync() {
+    setPending(true);
+    try {
+      const result = await api.investments.sync(investment.id);
+      toast.success(`Synced ${result.recordsProcessed} holdings`);
+      await onSynced();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to sync holdings");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Button variant="outline" size={labeled ? "default" : "icon-sm"} disabled={pending} onClick={() => void sync()}>
+      {pending ? <Spinner data-icon={labeled ? "inline-start" : undefined} /> : <RefreshCwIcon />}
+      {labeled ? "Sync holdings" : <span className="sr-only">Sync holdings</span>}
+    </Button>
+  );
+}
+
+export function InvestmentForm({
+  onSaved,
+  investment,
+}: {
+  onSaved: () => void;
+  investment?: Investment;
+}) {
+  const editing = Boolean(investment);
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
-  const [funds, setFunds] = useState<Fund[]>([]);
-  const [securities, setSecurities] = useState<Security[]>([]);
-  const [type, setType] = useState<InvestmentType>("mutual_fund");
-  const [country, setCountry] = useState<Country>("IN");
-  const [catalogId, setCatalogId] = useState<string | null>(null);
-
-  useEffect(() => {
-    void Promise.all([api.catalog.funds(), api.catalog.securities()]).then(([fundData, securityData]) => {
-      setFunds(fundData.funds);
-      setSecurities(securityData.securities);
-    });
-  }, []);
-
-  const catalogItems =
-    type === "stock"
-      ? securities
-          .filter((item) => item.country === country)
-          .map((item) => ({ label: `${item.standardizedName} (${item.ticker})`, value: item.id }))
-      : funds
-          .filter((item) => item.country === country && item.type === type)
-          .map((item) => ({ label: item.name, value: item.id }));
+  const [type, setType] = useState<InvestmentType>(investment?.type ?? "mutual_fund");
+  const [country, setCountry] = useState<Country>(investment?.country ?? "IN");
+  const [sector, setSector] = useState("Uncategorized");
 
   async function onSubmit(formData: FormData) {
     setPending(true);
     try {
-      const payload: CreateInvestmentRequest = {
-        name: String(formData.get("name") ?? "").trim(),
-        type,
-        country,
-        currency: (country === "IN" ? "INR" : "USD") as Currency,
-        investedAmount: Number(formData.get("investedAmount")),
-        currentValue: Number(formData.get("currentValue")),
-        units: formData.get("units") ? Number(formData.get("units")) : undefined,
-        fundId: type === "stock" ? undefined : catalogId || undefined,
-        securityId: type === "stock" ? catalogId || undefined : undefined,
-      };
-      await api.investments.create(payload);
-      toast.success("Investment added");
+      const payload = payloadFromForm(formData, type, country, sector);
+      if (investment) {
+        await api.investments.update(investment.id, payload);
+        toast.success("Investment updated");
+      } else {
+        await api.investments.create(payload);
+        toast.success(
+          payload.sourceUrl
+            ? "Investment added. Sync holdings to pull the stock split."
+            : "Investment added",
+        );
+      }
       setOpen(false);
-      onCreated();
+      onSaved();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to add investment");
+      toast.error(error instanceof Error ? error.message : "Unable to save investment");
     } finally {
       setPending(false);
     }
@@ -89,91 +291,49 @@ export function InvestmentForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>Add investment</DialogTrigger>
-      <DialogContent>
+      <DialogTrigger
+        render={
+          <Button variant={editing ? "outline" : "default"} size={editing ? "icon-sm" : "default"} />
+        }
+      >
+        {editing ? (
+          <>
+            <PencilIcon />
+            <span className="sr-only">Edit</span>
+          </>
+        ) : (
+          "Add investment"
+        )}
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add investment</DialogTitle>
-          <DialogDescription>Track a mutual fund, ETF, or direct stock position.</DialogDescription>
+          <DialogTitle>{editing ? "Edit investment" : "Add investment"}</DialogTitle>
+          <DialogDescription>
+            {editing
+              ? "Update invested amount, units, or the fund URL used for holdings sync."
+              : "Track a mutual fund, ETF, or direct stock you already hold."}
+          </DialogDescription>
         </DialogHeader>
-        <form className="flex flex-col gap-5" action={(formData) => void onSubmit(formData)}>
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="name">Name</FieldLabel>
-              <Input id="name" name="name" required maxLength={120} />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldLabel>Type</FieldLabel>
-                <Select items={typeItems} value={type} onValueChange={(value) => setType(value as InvestmentType)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {typeItems.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel>Country</FieldLabel>
-                <Select items={countryItems} value={country} onValueChange={(value) => setCountry(value as Country)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {countryItems.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-            <Field>
-              <FieldLabel>Linked security or fund</FieldLabel>
-              <Select
-                items={[{ label: "None", value: null }, ...catalogItems]}
-                value={catalogId}
-                onValueChange={(value) => setCatalogId(value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value={null}>None</SelectItem>
-                    {catalogItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field>
-                <FieldLabel htmlFor="investedAmount">Invested</FieldLabel>
-                <Input id="investedAmount" name="investedAmount" type="number" min="1" step="0.01" required />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="currentValue">Current value</FieldLabel>
-                <Input id="currentValue" name="currentValue" type="number" min="0" step="0.01" required />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="units">Units</FieldLabel>
-                <Input id="units" name="units" type="number" min="0" step="0.001" />
-              </Field>
-            </div>
-          </FieldGroup>
+        <form
+          key={`${investment?.id ?? "new"}-${open}`}
+          className="flex flex-col gap-5"
+          action={(formData) => void onSubmit(formData)}
+        >
+          <InvestmentFields
+            type={type}
+            country={country}
+            sector={sector}
+            lockType={editing}
+            defaults={{
+              name: investment?.name,
+              investedAmount: investment?.investedAmount,
+              units: investment?.units,
+              sourceUrl: investment?.sourceUrl,
+            }}
+            onTypeChange={setType}
+            onCountryChange={setCountry}
+            onSectorChange={setSector}
+          />
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? <Spinner data-icon="inline-start" /> : null}

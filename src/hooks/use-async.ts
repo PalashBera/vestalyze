@@ -10,9 +10,13 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []) {
   const [loading, setLoading] = useState(true);
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
+  const hasDataRef = useRef(false);
+  hasDataRef.current = data != null;
 
   async function reload() {
-    setLoading(true);
+    if (!hasDataRef.current) {
+      setLoading(true);
+    }
     try {
       const result = await loaderRef.current();
       setData(result);

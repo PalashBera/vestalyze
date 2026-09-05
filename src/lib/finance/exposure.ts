@@ -21,7 +21,6 @@ function emptyExposure(security: Security): StockExposure {
     indiaInvestedInr: 0,
     usInvestedInr: 0,
     totalInvestedInr: 0,
-    totalCurrentInr: 0,
     portfolioPercentage: 0,
     breakdown: [],
   };
@@ -32,6 +31,7 @@ export function calculateExposures(
   holdings: FundHolding[],
   securities: Security[],
   funds: Fund[],
+  usdInr?: number,
 ): StockExposure[] {
   const securityMap = new Map(securities.map((item) => [item.id, item]));
   const fundMap = new Map(funds.map((item) => [item.id, item]));
@@ -65,8 +65,7 @@ export function calculateExposures(
       if (!row) {
         continue;
       }
-      const investedInr = toInr(investment.investedAmount, investment.currency);
-      const currentInr = toInr(investment.currentValue, investment.currency);
+      const investedInr = toInr(investment.investedAmount, investment.currency, usdInr);
       row.directInvestedInr += investedInr;
       if (investment.country === "IN") {
         row.indiaInvestedInr += investedInr;
@@ -74,7 +73,6 @@ export function calculateExposures(
         row.usInvestedInr += investedInr;
       }
       row.totalInvestedInr += investedInr;
-      row.totalCurrentInr += currentInr;
       row.breakdown.push({
         sourceType: "stock",
         sourceName: investment.name,
@@ -82,9 +80,7 @@ export function calculateExposures(
         country: investment.country,
         currency: investment.currency,
         investedExposureNative: investment.investedAmount,
-        currentExposureNative: investment.currentValue,
         investedExposureInr: investedInr,
-        currentExposureInr: currentInr,
       });
       continue;
     }
@@ -103,9 +99,7 @@ export function calculateExposures(
       }
       const weight = holding.allocationPercentage / 100;
       const investedNative = investment.investedAmount * weight;
-      const currentNative = investment.currentValue * weight;
-      const investedInr = toInr(investedNative, investment.currency);
-      const currentInr = toInr(currentNative, investment.currency);
+      const investedInr = toInr(investedNative, investment.currency, usdInr);
 
       if (investment.type === "mutual_fund") {
         row.mutualFundInvestedInr += investedInr;
@@ -120,7 +114,6 @@ export function calculateExposures(
       }
 
       row.totalInvestedInr += investedInr;
-      row.totalCurrentInr += currentInr;
       row.breakdown.push({
         sourceType: investment.type,
         sourceName: fund?.name ?? investment.name,
@@ -129,15 +122,13 @@ export function calculateExposures(
         currency: investment.currency,
         allocationPercentage: holding.allocationPercentage,
         investedExposureNative: investedNative,
-        currentExposureNative: currentNative,
         investedExposureInr: investedInr,
-        currentExposureInr: currentInr,
       });
     }
   }
 
   const totalPortfolio = investments.reduce(
-    (sum, item) => sum + toInr(item.investedAmount, item.currency),
+    (sum, item) => sum + toInr(item.investedAmount, item.currency, usdInr),
     0,
   );
 
@@ -154,12 +145,13 @@ function slice(
   label: string,
   amountInr: number,
   totalInr: number,
+  usdInr?: number,
 ): AllocationSlice {
   return {
     key,
     label,
     amountInr,
-    amountUsd: toUsd(amountInr, "INR"),
+    amountUsd: toUsd(amountInr, "INR", usdInr),
     percentage: totalInr > 0 ? (amountInr / totalInr) * 100 : 0,
   };
 }
@@ -167,57 +159,42 @@ function slice(
 export function buildOverview(
   investments: Investment[],
   exposures: StockExposure[],
+  fx = getFxRate(),
 ): PortfolioOverview {
+  const usdInr = fx.rate;
   const totalInvestedInr = investments.reduce(
-    (sum, item) => sum + toInr(item.investedAmount, item.currency),
-    0,
-  );
-  const totalCurrentInr = investments.reduce(
-    (sum, item) => sum + toInr(item.currentValue, item.currency),
+    (sum, item) => sum + toInr(item.investedAmount, item.currency, usdInr),
     0,
   );
   const indiaInvestedInr = investments
     .filter((item) => item.country === "IN")
-    .reduce((sum, item) => sum + toInr(item.investedAmount, item.currency), 0);
+    .reduce((sum, item) => sum + toInr(item.investedAmount, item.currency, usdInr), 0);
   const usInvestedInr = totalInvestedInr - indiaInvestedInr;
   const mutualFundInvestedInr = investments
     .filter((item) => item.type === "mutual_fund")
-    .reduce((sum, item) => sum + toInr(item.investedAmount, item.currency), 0);
+    .reduce((sum, item) => sum + toInr(item.investedAmount, item.currency, usdInr), 0);
   const etfInvestedInr = investments
     .filter((item) => item.type === "etf")
-    .reduce((sum, item) => sum + toInr(item.investedAmount, item.currency), 0);
+    .reduce((sum, item) => sum + toInr(item.investedAmount, item.currency, usdInr), 0);
   const stockInvestedInr = totalInvestedInr - mutualFundInvestedInr - etfInvestedInr;
-
-  const sectorTotals = new Map<string, number>();
-  for (const exposure of exposures) {
-    const current = sectorTotals.get(exposure.security.sector) ?? 0;
-    sectorTotals.set(exposure.security.sector, current + exposure.totalInvestedInr);
-  }
 
   return {
     totalInvestedInr,
-    totalCurrentInr,
-    profitLossInr: totalCurrentInr - totalInvestedInr,
-    returnPercentage:
-      totalInvestedInr > 0 ? ((totalCurrentInr - totalInvestedInr) / totalInvestedInr) * 100 : 0,
     indiaInvestedInr,
     usInvestedInr,
     mutualFundInvestedInr,
     etfInvestedInr,
     stockInvestedInr,
-    fxRate: getFxRate(),
+    fxRate: fx,
     marketAllocation: [
-      slice("IN", "India", indiaInvestedInr, totalInvestedInr),
-      slice("US", "United States", usInvestedInr, totalInvestedInr),
+      slice("IN", "India", indiaInvestedInr, totalInvestedInr, usdInr),
+      slice("US", "United States", usInvestedInr, totalInvestedInr, usdInr),
     ],
     typeAllocation: [
-      slice("mutual_fund", "Mutual Funds", mutualFundInvestedInr, totalInvestedInr),
-      slice("etf", "ETFs", etfInvestedInr, totalInvestedInr),
-      slice("stock", "Direct Stocks", stockInvestedInr, totalInvestedInr),
+      slice("mutual_fund", "Mutual Funds", mutualFundInvestedInr, totalInvestedInr, usdInr),
+      slice("etf", "ETFs", etfInvestedInr, totalInvestedInr, usdInr),
+      slice("stock", "Direct Stocks", stockInvestedInr, totalInvestedInr, usdInr),
     ],
-    sectorAllocation: [...sectorTotals.entries()]
-      .map(([key, amount]) => slice(key, key, amount, totalInvestedInr))
-      .sort((a, b) => b.amountInr - a.amountInr),
     topHoldings: exposures.slice(0, 10),
   };
 }
@@ -226,14 +203,12 @@ export function buildMarketDashboard(
   country: Country,
   investments: Investment[],
   exposures: StockExposure[],
+  usdInr?: number,
 ): MarketDashboard {
   const filtered = investments.filter((item) => item.country === country);
   const currency = country === "IN" ? "INR" : "USD";
   const totalInvestedNative = filtered.reduce((sum, item) => {
-    return sum + (currency === item.currency ? item.investedAmount : toUsd(item.investedAmount, item.currency));
-  }, 0);
-  const totalCurrentNative = filtered.reduce((sum, item) => {
-    return sum + (currency === item.currency ? item.currentValue : toUsd(item.currentValue, item.currency));
+    return sum + (currency === item.currency ? item.investedAmount : toUsd(item.investedAmount, item.currency, usdInr));
   }, 0);
 
   const byType = {
@@ -251,7 +226,6 @@ export function buildMarketDashboard(
   return {
     country,
     totalInvestedNative,
-    totalCurrentNative,
     currency,
     byType,
     exposures: exposures.filter((item) =>

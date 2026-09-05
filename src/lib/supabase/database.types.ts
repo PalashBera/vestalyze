@@ -8,23 +8,30 @@ export type Database = {
           id: string;
           name: string;
           display_currency: "INR" | "USD";
+          fx_usd_inr: number;
+          fx_as_of: string;
           created_at: string;
         };
         Insert: {
           id: string;
           name: string;
           display_currency?: "INR" | "USD";
+          fx_usd_inr?: number;
+          fx_as_of?: string;
           created_at?: string;
         };
         Update: {
           name?: string;
           display_currency?: "INR" | "USD";
+          fx_usd_inr?: number;
+          fx_as_of?: string;
         };
         Relationships: [];
       };
       securities: {
         Row: {
           id: string;
+          user_id: string;
           company_name: string;
           standardized_name: string;
           ticker: string;
@@ -42,6 +49,7 @@ export type Database = {
       funds: {
         Row: {
           id: string;
+          user_id: string;
           name: string;
           symbol: string;
           type: "mutual_fund" | "etf";
@@ -62,12 +70,11 @@ export type Database = {
       fund_holdings: {
         Row: {
           id: string;
+          user_id: string;
           fund_id: string;
           security_id: string;
           allocation_percentage: number;
           holding_date: string;
-          shares: number | null;
-          market_value: number | null;
           source_id: string;
         };
         Insert: Database["public"]["Tables"]["fund_holdings"]["Row"];
@@ -85,8 +92,9 @@ export type Database = {
           country: "IN" | "US";
           currency: "INR" | "USD";
           invested_amount: number;
-          current_value: number;
           units: number | null;
+          source_url: string | null;
+          last_synced_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -100,123 +108,48 @@ export type Database = {
           country: "IN" | "US";
           currency: "INR" | "USD";
           invested_amount: number;
-          current_value: number;
           units?: number | null;
+          source_url?: string | null;
+          last_synced_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           name?: string;
           invested_amount?: number;
-          current_value?: number;
           units?: number | null;
+          source_url?: string | null;
+          last_synced_at?: string | null;
+          fund_id?: string | null;
           updated_at?: string;
         };
         Relationships: [];
       };
-      investment_transactions: {
+      investment_syncs: {
         Row: {
           id: string;
+          user_id: string;
           investment_id: string;
-          transaction_date: string;
-          units: number | null;
-          purchase_price: number | null;
-          invested_amount: number;
-        };
-        Insert: {
-          id?: string;
-          investment_id: string;
-          transaction_date: string;
-          units?: number | null;
-          purchase_price?: number | null;
-          invested_amount: number;
-        };
-        Update: Partial<Database["public"]["Tables"]["investment_transactions"]["Row"]>;
-        Relationships: [];
-      };
-      data_sources: {
-        Row: {
-          id: string;
-          name: string;
-          url: string;
-          type: "indian_mf" | "indian_etf" | "us_etf" | "factsheet";
-          last_scraped_at: string;
-          last_successful_at: string | null;
-          status: "fresh" | "stale" | "failed" | "pending";
-        };
-        Insert: Database["public"]["Tables"]["data_sources"]["Row"];
-        Update: Partial<Database["public"]["Tables"]["data_sources"]["Row"]>;
-        Relationships: [];
-      };
-      scraping_logs: {
-        Row: {
-          id: string;
-          data_source_id: string;
           started_at: string;
-          completed_at: string | null;
           status: "success" | "failed" | "running";
           records_processed: number;
           error_message: string | null;
         };
         Insert: {
           id?: string;
-          data_source_id: string;
+          user_id: string;
+          investment_id: string;
           started_at?: string;
-          completed_at?: string | null;
           status: "success" | "failed" | "running";
           records_processed?: number;
           error_message?: string | null;
         };
-        Update: Partial<Database["public"]["Tables"]["scraping_logs"]["Row"]>;
-        Relationships: [];
-      };
-      fx_rates: {
-        Row: {
-          base: "INR" | "USD";
-          quote: "INR" | "USD";
-          rate: number;
-          as_of: string;
-        };
-        Insert: Database["public"]["Tables"]["fx_rates"]["Row"];
-        Update: Partial<Database["public"]["Tables"]["fx_rates"]["Row"]>;
-        Relationships: [];
-      };
-      url_extractions: {
-        Row: {
-          id: string;
-          user_id: string;
-          url: string;
-          final_url: string;
-          title: string;
-          description: string;
-          content_text: string;
-          content_type: string;
-          status_code: number;
-          extracted_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          url: string;
-          final_url: string;
-          title?: string;
-          description?: string;
-          content_text?: string;
-          content_type?: string;
-          status_code: number;
-          extracted_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["url_extractions"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["investment_syncs"]["Row"]>;
         Relationships: [];
       };
     };
     Views: Record<string, never>;
-    Functions: {
-      clone_sample_portfolio: {
-        Args: Record<string, never>;
-        Returns: undefined;
-      };
-    };
+    Functions: Record<string, never>;
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

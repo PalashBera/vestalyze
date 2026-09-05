@@ -12,6 +12,7 @@ type SettingsContextValue = {
   currency: Currency;
   fxRate: FxRate | null;
   setCurrency: (currency: Currency) => Promise<void>;
+  setFxRate: (rate: number) => Promise<void>;
   refreshUser: () => Promise<void>;
   money: (amountInr: number, compact?: boolean) => string;
   moneyNative: (amount: number, native: Currency, compact?: boolean) => string;
@@ -35,7 +36,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    if (pathname === "/login" || pathname === "/register") {
+    if (pathname === "/" || pathname === "/login" || pathname === "/register") {
       return;
     }
 
@@ -67,6 +68,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setUser((current) => (current ? { ...current, displayCurrency: settings.displayCurrency } : current));
   }
 
+  async function updateFxRate(rate: number) {
+    const next = await api.settings.updateFx(rate);
+    setFxRate(next);
+  }
+
   const value = useMemo<SettingsContextValue>(() => {
     const displayCurrency = user?.displayCurrency ?? "INR";
     const rate = fxRate?.rate ?? 87.25;
@@ -75,6 +81,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       currency: displayCurrency,
       fxRate,
       setCurrency,
+      setFxRate: updateFxRate,
       refreshUser,
       money: (amountInr, compact) =>
         formatMoney(convert(amountInr, "INR", displayCurrency, rate), displayCurrency, compact),

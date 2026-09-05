@@ -1,5 +1,7 @@
 import type { Currency } from "@/lib/api/types";
-import { FX_AS_OF, FX_USD_INR } from "@/lib/api/mock/data";
+
+export const FX_USD_INR = 87.25;
+export const FX_AS_OF = "2026-09-04";
 
 export function toInr(amount: number, currency: Currency, usdInr = FX_USD_INR): number {
   return currency === "INR" ? amount : amount * usdInr;

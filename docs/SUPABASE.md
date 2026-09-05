@@ -1,15 +1,15 @@
 # Supabase Backend
 
-This document is the contract for running the Look-Through Portfolio API on **Supabase Auth + Postgres**.
+This document is the contract for running the Investment Portfolio API on **Supabase Auth + Postgres**.
 
 The browser still calls Next.js `/api/v1/...`. Next.js is the BFF:
 
 1. The browser sends the request with cookies.
 2. Next.js creates a Supabase server client from those cookies.
-3. Supabase Auth identifies the user. Row Level Security scopes every query.
+3. Supabase Auth identifies the user. Row Level Security scopes every query to that user.
 4. Look-through math stays in `src/lib/finance`. Supabase stores data; it does not reimplement exposure formulas.
 
-Set `API_PROVIDER=supabase` to use this path. `mock` remains the default for local UI work without a project.
+Set `API_PROVIDER=supabase` to use this path. The in-memory provider (`API_PROVIDER=mock`) remains the default for local UI work without a project. Both providers scope nested data by user.
 
 The `/api/v1` JSON shapes stay the same in both providers so the UI does not change.
 
@@ -23,7 +23,7 @@ The `/api/v1` JSON shapes stay the same in both providers so the UI does not cha
 4. **Authentication → Providers → Email → Confirm email**: turn **off** for local development so `signUp` returns a session immediately. Turn it on in production.
 5. **Authentication → Settings**: set a Site URL of `http://localhost:3000` for local work.
 
-Do not use the service role key in this app. Catalog data is loaded with SQL. Every request uses the anon key plus the user JWT so RLS applies.
+Do not use the service role key in this app. Every request uses the anon key plus the user JWT so RLS applies.
 
 ---
 
@@ -55,42 +55,38 @@ SUPABASE_ANON_KEY=
 
 In the Supabase SQL editor, run in order:
 
-1. [`supabase/schema.sql`](../supabase/schema.sql) — tables, trigger, `clone_sample_portfolio()`, RLS
-2. [`supabase/seed.sql`](../supabase/seed.sql) — securities, funds, holdings, FX, data sources
+1. [`supabase/schema.sql`](../supabase/schema.sql) — tables, trigger, owner-only RLS
+2. [`supabase/seed.sql`](../supabase/seed.sql) — notes only; FX defaults live on `profiles`
 
-That seed is the same catalog the mock API uses (PPFAS, HDFC Mid-Cap, Nifty BeES, VOO, QQQ, and the security master).
-
-New users do **not** get rows from `seed.sql`. After register, Next.js calls `clone_sample_portfolio()`, which inserts the sample positions for `auth.uid()`.
+There is no sample portfolio. New users add holdings in onboarding. Company names from fund syncs and direct stocks they enter are stored in `securities` under their `user_id`.
 
 ---
 
 ## 4. Tables
 
-| Table                     | Purpose                             | RLS                                         |
-| ------------------------- | ----------------------------------- | ------------------------------------------- |
-| `profiles`                | Display name and reporting currency | Own row only                                |
-| `securities`              | Security master                     | Authenticated read                          |
-| `funds`                   | Mutual funds and ETFs               | Authenticated read; update for refresh stub |
-| `fund_holdings`           | Allocation % by fund and date       | Authenticated read                          |
-| `investments`             | User positions                      | CRUD where `user_id = auth.uid()`           |
-| `investment_transactions` | Lots                                | Via parent investment ownership             |
-| `data_sources`            | Scraper registry                    | Authenticated read/update                   |
-| `scraping_logs`           | Job history                         | Authenticated read/insert                   |
-| `url_extractions`         | Raw page text from a pasted URL     | Own rows only                               |
-| `fx_rates`                | USD/INR                             | Authenticated read                          |
+| Table               | Purpose                                    | RLS                                 |
+| ------------------- | ------------------------------------------ | ----------------------------------- |
+| `profiles`          | Name, display currency, and USD/INR rate   | Own row only                        |
+| `securities`        | Per-user security master                   | Owner CRUD (`user_id = auth.uid()`) |
+| `funds`             | Per-user mutual funds and ETFs             | Owner CRUD                          |
+| `fund_holdings`     | Per-user allocation %                      | Owner CRUD                          |
+| `investments`       | User positions (invested amount + units)   | Owner CRUD                          |
+| `investment_syncs`  | Per-investment scrape history              | Owner CRUD                          |
 
-`profiles.id` references `auth.users(id)`. A trigger `handle_new_user` inserts a profile from `raw_user_meta_data.name` on signup.
+`profiles.id` references `auth.users(id)`. A trigger `handle_new_user` inserts a profile from `raw_user_meta_data.name` on signup, with default FX `87.25`.
+
+Securities are unique on `(user_id, ticker, country)`. Two accounts can own the same ticker without colliding.
 
 ---
 
 ## 5. Authentication
 
-| App endpoint                 | Supabase call                                   |
-| ---------------------------- | ----------------------------------------------- |
-| `POST /api/v1/auth/register` | `auth.signUp` + `rpc('clone_sample_portfolio')` |
-| `POST /api/v1/auth/login`    | `auth.signInWithPassword`                       |
-| `POST /api/v1/auth/logout`   | `auth.signOut`                                  |
-| `GET /api/v1/auth/me`        | `auth.getUser` + `profiles`                     |
+| App endpoint                 | Supabase call                   |
+| ---------------------------- | ------------------------------- |
+| `POST /api/v1/auth/register` | `auth.signUp` + profile trigger |
+| `POST /api/v1/auth/login`    | `auth.signInWithPassword`       |
+| `POST /api/v1/auth/logout`   | `auth.signOut`                  |
+| `GET /api/v1/auth/me`        | `auth.getUser` + `profiles`     |
 
 Sessions are stored in **HttpOnly**, `SameSite=Lax` cookies by `@supabase/ssr`. `Secure` is set in production. The proxy treats `sb-*-auth-token*` cookies as a signed-in session.
 
@@ -104,24 +100,19 @@ If Confirm email is on and there is no session after signup, the API returns: `A
 
 ## 6. API mapping
 
-Same paths as the mock API. When `API_PROVIDER=supabase`, handlers in `src/lib/api/supabase/handlers.ts` run.
+Same paths as the in-memory API. When `API_PROVIDER=supabase`, handlers in `src/lib/api/supabase/handlers.ts` run. Catalog routes still require a session and only return the caller’s rows.
 
 | HTTP             | Path                                          | Supabase work                                       |
 | ---------------- | --------------------------------------------- | --------------------------------------------------- |
 | GET/POST         | `/investments`                                | `investments` select / insert                       |
 | GET/PATCH/DELETE | `/investments/:id`                            | Scoped by `user_id`                                 |
-| GET/POST         | `/investments/:id/transactions`               | `investment_transactions`                           |
-| DELETE           | `/transactions/:id`                           | Delete if the user owns the parent                  |
-| GET              | `/funds`, `/funds/:id`, `/funds/:id/holdings` | Catalog read                                        |
-| POST             | `/funds/:id/refresh`                          | Updates `last_scraped_at` (scraper stub)            |
-| GET              | `/securities`, `/securities/:id`              | Security master                                     |
+| POST             | `/investments/:id/sync`                       | Scrape fund URL holdings, write `investment_syncs`  |
+| GET              | `/investments/:id/syncs`                      | Owner sync history                                  |
+| GET              | `/funds`, `/funds/:id`, `/funds/:id/holdings` | Owner catalog                                       |
+| GET              | `/securities`, `/securities/:id`              | Owner security master                               |
 | GET              | `/portfolio/*`                                | Load investments + holdings, then `src/lib/finance` |
-| GET/POST         | `/data-sources`, `/data-sources/:id/refresh`  | Registry + log insert                               |
-| GET              | `/scraping-logs`                              | Recent jobs                                         |
-| POST             | `/extract`                                    | Fetch a public URL, store row in `url_extractions`  |
-| GET              | `/extract`                                    | Recent extractions for the signed-in user           |
 | GET/PATCH        | `/settings`                                   | `profiles.display_currency`                         |
-| GET              | `/fx/rate`                                    | `fx_rates`                                          |
+| GET/PATCH        | `/fx/rate`                                    | `profiles.fx_usd_inr` / `fx_as_of`                  |
 
 Look-through formula (unchanged):
 
@@ -133,32 +124,24 @@ Combine the same company across funds, ETFs, and direct stocks.
 
 ---
 
-## 7. URL extraction
+## 7. Fund URL sync
 
-Yes — scraping can use Supabase. This first pass only extracts title, description, and text from a random public URL. Holdings parsers come later.
+Mutual funds and ETFs store a public **Fund URL**. Sync scrapes the page (SSRF-safe fetch: http/https only, no private hosts) and reads the `#holdings` section for company name + weight. Stock codes are not stored in the UI.
 
-How it works:
+Each run writes `investment_syncs` (`started_at`, `status`, `records_processed`). The investment’s `last_synced_at` updates on success.
 
-1. The signed-in user posts `{ "url": "https://..." }` to `/api/v1/extract`.
-2. Next.js validates the URL (http/https only, no credentials, no private/localhost hosts after DNS).
-3. It fetches the page with a timeout and size cap, then strips scripts/styles to plain text.
-4. The row is stored in `url_extractions` under RLS (`user_id = auth.uid()`).
-5. `extract-url` is also deployed as a JWT-protected Edge Function for later crawl jobs. The app path does not need it yet.
-
-Blocked by design: `file://`, `gopher://`, localhost, link-local, private RFC1918 ranges, and oversized/non-text responses.
-
-Use **Data sources → Extract a URL** to try it.
+INDmoney pages may sit behind Cloudflare. If the fetch returns a challenge page, sync fails with a clear error instead of empty holdings.
 
 ---
 
 ## 8. How to switch
 
 1. Create the project and disable confirm-email for local testing (Authentication → Providers → Email).
-2. Run `schema.sql` then `seed.sql` (already applied on project `yqpigjistuentvbvlabd` via MCP).
+2. Run `schema.sql` then `seed.sql`.
 3. Put `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `.env.local`.
 4. Set `API_PROVIDER=supabase`.
 5. Restart `npm run dev`.
-6. Register a new account. You should see the sample portfolio.
+6. Register a new account and complete onboarding. Pages stay on a blurred preview until you add holdings.
 
 To go back to the in-memory API: `API_PROVIDER=mock`.
 
@@ -170,7 +153,7 @@ To go back to the in-memory API: `API_PROVIDER=mock`.
 - Set Site URL and redirect URLs to the real HTTPS origin.
 - Enforce HTTPS. Cookies already use `Secure` when `NODE_ENV=production`.
 - Keep the service role out of the Next.js app and CI logs.
-- Tighten `funds` / `data_sources` update policies if this is no longer a single-user app (write only from a scraper worker).
+- Nested catalog tables already use owner-only RLS. Keep writes on the user JWT; do not bypass RLS with a service role from the app.
 - Prefer official portfolio files over HTML scraping when you replace the refresh stubs.
 - Rotate the anon key if it is ever committed.
 
@@ -180,8 +163,8 @@ To go back to the in-memory API: `API_PROVIDER=mock`.
 
 ```text
 docs/SUPABASE.md                 This guide
-supabase/schema.sql              Tables, RLS, trigger, clone function
-supabase/seed.sql                Catalog + FX
+supabase/schema.sql              Tables, RLS, trigger
+supabase/seed.sql                Notes (no sample portfolio)
 supabase/functions/extract-url   Optional Edge Function for later crawl jobs
 src/lib/supabase/server.ts       Cookie SSR client
 src/lib/supabase/database.types.ts

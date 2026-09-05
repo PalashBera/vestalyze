@@ -8,16 +8,21 @@ import {
   LayersIcon,
   LayoutDashboardIcon,
   LogOutIcon,
-  RefreshCwIcon,
   SettingsIcon,
   TableIcon,
   WalletIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { SidebarBrand } from "@/components/brand-mark";
 import { api } from "@/lib/api/client";
 import { useSettings } from "@/components/settings-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Sidebar,
   SidebarContent,
@@ -39,7 +44,6 @@ const links = [
   { href: "/india", label: "India Market", icon: LandmarkIcon },
   { href: "/us", label: "US Market", icon: ChartPieIcon },
   { href: "/overlap", label: "Fund Overlap", icon: TableIcon },
-  { href: "/data-sources", label: "Data Sources", icon: RefreshCwIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -57,11 +61,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader>
-        <div className="flex flex-col gap-1 px-2 py-1">
-          <p className="font-heading text-sm font-medium">Look-Through</p>
-          <p className="text-xs text-muted-foreground">Investment intelligence</p>
-        </div>
+      <SidebarHeader className="p-3">
+        <SidebarBrand />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -93,10 +94,22 @@ export function AppSidebar() {
             <p className="truncate text-sm">{user?.name ?? "Investor"}</p>
             <p className="truncate text-xs text-muted-foreground">{user?.email ?? ""}</p>
           </div>
-          <Button variant="ghost" size="icon-sm" onClick={() => void logout()}>
-            <LogOutIcon />
-            <span className="sr-only">Sign out</span>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="destructive"
+                  size="icon-sm"
+                  className="cursor-pointer"
+                  onClick={() => void logout()}
+                />
+              }
+            >
+              <LogOutIcon />
+              <span className="sr-only">Logout</span>
+            </TooltipTrigger>
+            <TooltipContent>Logout</TooltipContent>
+          </Tooltip>
         </div>
       </SidebarFooter>
       <SidebarRail />

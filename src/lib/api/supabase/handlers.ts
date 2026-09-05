@@ -1,6 +1,5 @@
 import type {
   CreateInvestmentRequest,
-  CreateTransactionRequest,
   Currency,
   LoginRequest,
   RegisterRequest,
@@ -15,20 +14,19 @@ import {
   calculateExposures,
 } from "@/lib/finance/exposure";
 import { getFxRate } from "@/lib/finance/currency";
+import { buildSecurityFromCompany, buildSecurityFromInput } from "@/lib/investments/security";
+import { isFundVehicle, normalizeSourceUrl } from "@/lib/investments/fund-url";
+import { scrapeFundHoldings } from "@/lib/extract/holdings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
-  mapDataSource,
   mapFund,
   mapHolding,
   mapInvestment,
-  mapLog,
   mapSecurity,
-  mapTransaction,
-  mapUrlExtraction,
+  mapSync,
   mapUser,
   throwQueryError,
 } from "@/lib/api/supabase/mappers";
-import { extractPublicUrl } from "@/lib/extract/url";
 
 const AUTH_ERROR = "Invalid username or password";
 
@@ -84,7 +82,6 @@ export async function supabaseRegister(input: RegisterRequest) {
     throwQueryError("Account created. Confirm the email before signing in.", 400);
   }
 
-  await supabase.rpc("clone_sample_portfolio");
   return { user: await loadProfile(data.user.id, data.user.email ?? email) };
 }
 
@@ -115,12 +112,12 @@ async function listInvestments(userId: string) {
   return (data ?? []).map(mapInvestment);
 }
 
-async function catalog() {
+async function catalog(userId: string) {
   const supabase = await client();
   const [funds, holdings, securities] = await Promise.all([
-    supabase.from("funds").select("*"),
-    supabase.from("fund_holdings").select("*"),
-    supabase.from("securities").select("*"),
+    supabase.from("funds").select("*").eq("user_id", userId),
+    supabase.from("fund_holdings").select("*").eq("user_id", userId),
+    supabase.from("securities").select("*").eq("user_id", userId),
   ]);
   if (funds.error || holdings.error || securities.error) {
     throwQueryError("Unable to load catalog.", 500);
@@ -132,31 +129,80 @@ async function catalog() {
   };
 }
 
-async function fxRate() {
+async function ensureSupabaseFund(
+  userId: string,
+  input: {
+    name: string;
+    type: "mutual_fund" | "etf";
+    country: "IN" | "US";
+    currency: "INR" | "USD";
+    sourceUrl: string;
+  },
+) {
+  const supabase = await client();
+  const { data: existing } = await supabase
+    .from("funds")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("source_url", input.sourceUrl)
+    .maybeSingle();
+  if (existing) {
+    return mapFund(existing);
+  }
+  const now = new Date().toISOString();
+  const host = new URL(input.sourceUrl).hostname;
+  const { data, error } = await supabase
+    .from("funds")
+    .insert({
+      id: `fund-${crypto.randomUUID()}`,
+      user_id: userId,
+      name: input.name,
+      symbol: input.name.slice(0, 16).toUpperCase().replace(/\s+/g, ""),
+      type: input.type,
+      fund_house: host,
+      category: "Uncategorized",
+      country: input.country,
+      currency: input.currency,
+      latest_portfolio_date: now.slice(0, 10),
+      source_website: host,
+      source_url: input.sourceUrl,
+      last_scraped_at: now,
+      data_status: "pending",
+    })
+    .select("*")
+    .single();
+  if (error || !data) {
+    throwQueryError("Unable to save the fund source.", 400);
+  }
+  return mapFund(data);
+}
+
+async function fxRate(userId: string) {
   const supabase = await client();
   const { data } = await supabase
-    .from("fx_rates")
-    .select("*")
-    .eq("base", "USD")
-    .eq("quote", "INR")
+    .from("profiles")
+    .select("fx_usd_inr, fx_as_of")
+    .eq("id", userId)
     .maybeSingle();
   if (!data) {
     return getFxRate();
   }
-  return getFxRate({ rate: Number(data.rate), asOf: data.as_of });
+  return getFxRate({ rate: Number(data.fx_usd_inr), asOf: data.fx_as_of });
 }
 
 async function exposuresFor(userId: string) {
-  const [{ funds, holdings, securities }, investments] = await Promise.all([
-    catalog(),
+  const [{ funds, holdings, securities }, investments, fx] = await Promise.all([
+    catalog(userId),
     listInvestments(userId),
+    fxRate(userId),
   ]);
   return {
     investments,
     funds,
     holdings,
     securities,
-    exposures: calculateExposures(investments, holdings, securities, funds),
+    fx,
+    exposures: calculateExposures(investments, holdings, securities, funds, fx.rate),
   };
 }
 
@@ -177,12 +223,14 @@ export async function supabaseGetInvestment(userId: string, id: string) {
   }
 
   const investment = mapInvestment(data);
-  const { funds, holdings, securities } = await catalog();
-  const { data: transactions } = await supabase
-    .from("investment_transactions")
+  const { funds, holdings, securities } = await catalog(userId);
+  const { data: syncs } = await supabase
+    .from("investment_syncs")
     .select("*")
     .eq("investment_id", id)
-    .order("transaction_date");
+    .eq("user_id", userId)
+    .order("started_at", { ascending: false })
+    .limit(20);
 
   return {
     investment,
@@ -198,7 +246,7 @@ export async function supabaseGetInvestment(userId: string, id: string) {
             security: securities.find((security) => security.id === item.securityId),
           }))
       : [],
-    transactions: (transactions ?? []).map(mapTransaction),
+    syncs: (syncs ?? []).map(mapSync),
   };
 }
 
@@ -216,20 +264,88 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
     throwQueryError("Invested amount must be greater than zero.", 400);
   }
 
+  const sourceUrl = normalizeSourceUrl(input.sourceUrl);
+  if (isFundVehicle(input.type) && !sourceUrl) {
+    throwQueryError("Fund URL is required for mutual funds and ETFs.", 400);
+  }
+
   const supabase = await client();
+  let fundId = input.fundId ?? null;
+  if (input.fundId) {
+    const { data: ownedFund } = await supabase
+      .from("funds")
+      .select("id")
+      .eq("id", input.fundId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ownedFund) {
+      throwQueryError("Fund not found", 404);
+    }
+  }
+  if (isFundVehicle(input.type) && sourceUrl) {
+    fundId = (
+      await ensureSupabaseFund(userId, {
+        name: input.name.trim(),
+        type: input.type,
+        country: input.country,
+        currency: input.currency,
+        sourceUrl,
+      })
+    ).id;
+  }
+  const security = buildSecurityFromInput(input, userId);
+  if (security) {
+    const { data: existing } = await supabase
+      .from("securities")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("ticker", security.ticker)
+      .eq("country", security.country)
+      .maybeSingle();
+    if (existing) {
+      security.id = existing.id;
+    } else {
+      const { error: securityError } = await supabase.from("securities").insert({
+        id: security.id,
+        user_id: userId,
+        company_name: security.companyName,
+        standardized_name: security.standardizedName,
+        ticker: security.ticker,
+        isin: security.isin ?? null,
+        exchange: security.exchange,
+        country: security.country,
+        currency: security.currency,
+        sector: security.sector,
+        industry: security.industry,
+      });
+      if (securityError) {
+        throwQueryError("Unable to save the stock details.", 400);
+      }
+    }
+  } else if (input.securityId) {
+    const { data: ownedSecurity } = await supabase
+      .from("securities")
+      .select("id")
+      .eq("id", input.securityId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!ownedSecurity) {
+      throwQueryError("Security not found", 404);
+    }
+  }
   const { data, error } = await supabase
     .from("investments")
     .insert({
       user_id: userId,
-      fund_id: input.fundId ?? null,
-      security_id: input.securityId ?? null,
+      fund_id: fundId,
+      security_id: security?.id ?? input.securityId ?? null,
       name: input.name.trim(),
       type: input.type,
       country: input.country,
       currency: input.currency,
       invested_amount: input.investedAmount,
-      current_value: input.currentValue > 0 ? input.currentValue : input.investedAmount,
       units: input.units ?? null,
+      source_url: sourceUrl || null,
     })
     .select("*")
     .single();
@@ -248,11 +364,13 @@ export async function supabaseUpdateInvestment(
     throwQueryError("Invested amount must be greater than zero.", 400);
   }
   const supabase = await client();
+  const current = await supabaseGetInvestment(userId, id);
   const patch: {
     name?: string;
     invested_amount?: number;
-    current_value?: number;
-    units?: number;
+    units?: number | null;
+    source_url?: string | null;
+    fund_id?: string | null;
     updated_at: string;
   } = { updated_at: new Date().toISOString() };
   if (input.name) {
@@ -261,11 +379,26 @@ export async function supabaseUpdateInvestment(
   if (input.investedAmount !== undefined) {
     patch.invested_amount = input.investedAmount;
   }
-  if (input.currentValue !== undefined) {
-    patch.current_value = input.currentValue;
-  }
   if (input.units !== undefined) {
     patch.units = input.units;
+  }
+  if (input.sourceUrl !== undefined) {
+    const sourceUrl = normalizeSourceUrl(input.sourceUrl);
+    if (isFundVehicle(current.investment.type) && !sourceUrl) {
+      throwQueryError("Fund URL is required for mutual funds and ETFs.", 400);
+    }
+    patch.source_url = sourceUrl || null;
+    if (isFundVehicle(current.investment.type) && sourceUrl) {
+      patch.fund_id = (
+        await ensureSupabaseFund(userId, {
+          name: patch.name ?? current.investment.name,
+          type: current.investment.type,
+          country: current.investment.country,
+          currency: current.investment.currency,
+          sourceUrl,
+        })
+      ).id;
+    }
   }
   const { data, error } = await supabase
     .from("investments")
@@ -278,6 +411,158 @@ export async function supabaseUpdateInvestment(
     throwQueryError("Investment not found", 404);
   }
   return mapInvestment(data);
+}
+
+export async function supabaseSyncInvestment(userId: string, id: string) {
+  const detail = await supabaseGetInvestment(userId, id);
+  const investment = detail.investment;
+  if (!isFundVehicle(investment.type)) {
+    throwQueryError("Sync is only available for mutual funds and ETFs.", 400);
+  }
+  const sourceUrl = normalizeSourceUrl(investment.sourceUrl);
+  if (!sourceUrl) {
+    throwQueryError("Add a fund URL before syncing holdings.", 400);
+  }
+
+  const supabase = await client();
+  const startedAt = new Date().toISOString();
+  const { data: syncRow, error: syncError } = await supabase
+    .from("investment_syncs")
+    .insert({
+      user_id: userId,
+      investment_id: id,
+      started_at: startedAt,
+      status: "running",
+      records_processed: 0,
+    })
+    .select("*")
+    .single();
+  if (syncError || !syncRow) {
+    throwQueryError("Unable to start sync.", 500);
+  }
+
+  try {
+    const scraped = await scrapeFundHoldings(sourceUrl);
+    const fund = await ensureSupabaseFund(userId, {
+      name: investment.name,
+      type: investment.type,
+      country: investment.country,
+      currency: investment.currency,
+      sourceUrl,
+    });
+
+    await supabase.from("fund_holdings").delete().eq("fund_id", fund.id).eq("user_id", userId);
+
+    const holdingRows = [];
+    for (const item of scraped.holdings) {
+      const security = buildSecurityFromCompany(userId, item.name, investment.country);
+      const { data: existing } = await supabase
+        .from("securities")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("ticker", security.ticker)
+        .eq("country", security.country)
+        .maybeSingle();
+      const securityId = existing?.id ?? security.id;
+      if (!existing) {
+        const { error: securityError } = await supabase.from("securities").insert({
+          id: security.id,
+          user_id: userId,
+          company_name: security.companyName,
+          standardized_name: security.standardizedName,
+          ticker: security.ticker,
+          isin: null,
+          exchange: security.exchange,
+          country: security.country,
+          currency: security.currency,
+          sector: security.sector,
+          industry: security.industry,
+        });
+        if (securityError) {
+          throwQueryError("Unable to save a holding company.", 400);
+        }
+      }
+      holdingRows.push({
+        id: `hold-${crypto.randomUUID()}`,
+        user_id: userId,
+        fund_id: fund.id,
+        security_id: securityId,
+        allocation_percentage: item.allocationPercentage,
+        holding_date: scraped.holdingDate,
+        source_id: "indmoney-holdings",
+      });
+    }
+
+    if (holdingRows.length > 0) {
+      const { error: holdingsError } = await supabase.from("fund_holdings").insert(holdingRows);
+      if (holdingsError) {
+        throwQueryError("Unable to save fund holdings.", 400);
+      }
+    }
+
+    const completedAt = new Date().toISOString();
+    await supabase
+      .from("funds")
+      .update({
+        last_scraped_at: completedAt,
+        latest_portfolio_date: scraped.holdingDate,
+        data_status: "fresh",
+        source_url: sourceUrl,
+      })
+      .eq("id", fund.id)
+      .eq("user_id", userId);
+    await supabase
+      .from("investments")
+      .update({ fund_id: fund.id, last_synced_at: completedAt, source_url: sourceUrl })
+      .eq("fund_id", fund.id)
+      .eq("user_id", userId);
+    await supabase
+      .from("investments")
+      .update({ fund_id: fund.id, last_synced_at: completedAt, source_url: sourceUrl })
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    const { data: finished } = await supabase
+      .from("investment_syncs")
+      .update({
+        status: "success",
+        records_processed: holdingRows.length,
+      })
+      .eq("id", syncRow.id)
+      .select("*")
+      .single();
+
+    return {
+      investment: (await supabaseGetInvestment(userId, id)).investment,
+      sync: mapSync(finished ?? { ...syncRow, status: "success", records_processed: holdingRows.length }),
+      recordsProcessed: holdingRows.length,
+    };
+  } catch (error) {
+    await supabase
+      .from("investment_syncs")
+      .update({
+        status: "failed",
+        error_message: error instanceof Error ? error.message : "Sync failed",
+      })
+      .eq("id", syncRow.id);
+    throw error;
+  }
+}
+
+export async function supabaseListSyncs(userId: string, investmentId: string) {
+  await supabaseGetInvestment(userId, investmentId);
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("investment_syncs")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("investment_id", investmentId)
+    .order("started_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    throwQueryError("Unable to load sync history.", 500);
+  }
+  return (data ?? []).map(mapSync);
 }
 
 export async function supabaseDeleteInvestment(userId: string, id: string) {
@@ -295,66 +580,12 @@ export async function supabaseDeleteInvestment(userId: string, id: string) {
   return { ok: true };
 }
 
-export async function supabaseCreateTransaction(
-  userId: string,
-  investmentId: string,
-  input: CreateTransactionRequest,
-) {
-  if (!input.transactionDate || input.investedAmount <= 0) {
-    throwQueryError("A valid date and amount are required.", 400);
-  }
-  const detail = await supabaseGetInvestment(userId, investmentId);
-  const supabase = await client();
-  const { data, error } = await supabase
-    .from("investment_transactions")
-    .insert({
-      investment_id: investmentId,
-      transaction_date: input.transactionDate,
-      invested_amount: input.investedAmount,
-      units: input.units ?? null,
-      purchase_price: input.purchasePrice ?? null,
-    })
-    .select("*")
-    .single();
-  if (error || !data) {
-    throwQueryError("Unable to add transaction.", 400);
-  }
-  await supabase
-    .from("investments")
-    .update({
-      invested_amount: detail.investment.investedAmount + input.investedAmount,
-      units: (detail.investment.units ?? 0) + (input.units ?? 0),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", investmentId)
-    .eq("user_id", userId);
-  return mapTransaction(data);
+export async function supabaseListFunds(userId: string) {
+  return (await catalog(userId)).funds;
 }
 
-export async function supabaseDeleteTransaction(userId: string, id: string) {
-  const supabase = await client();
-  const { data: transaction } = await supabase
-    .from("investment_transactions")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (!transaction) {
-    throwQueryError("Transaction not found", 404);
-  }
-  await supabaseGetInvestment(userId, transaction.investment_id);
-  const { error } = await supabase.from("investment_transactions").delete().eq("id", id);
-  if (error) {
-    throwQueryError("Transaction not found", 404);
-  }
-  return { ok: true };
-}
-
-export async function supabaseListFunds() {
-  return (await catalog()).funds;
-}
-
-export async function supabaseGetFund(id: string) {
-  const { funds, holdings, securities } = await catalog();
+export async function supabaseGetFund(userId: string, id: string) {
+  const { funds, holdings, securities } = await catalog(userId);
   const fund = funds.find((item) => item.id === id);
   if (!fund) {
     throwQueryError("Fund not found", 404);
@@ -370,19 +601,20 @@ export async function supabaseGetFund(id: string) {
   };
 }
 
-export async function supabaseRefreshFund(id: string) {
+export async function supabaseRefreshFund(userId: string, id: string) {
   const supabase = await client();
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("funds")
     .update({ last_scraped_at: now, data_status: "fresh" })
     .eq("id", id)
+    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
   if (error || !data) {
     throwQueryError("Fund not found", 404);
   }
-  const { holdings } = await catalog();
+  const { holdings } = await catalog(userId);
   return {
     fundId: id,
     status: "success" as const,
@@ -392,12 +624,12 @@ export async function supabaseRefreshFund(id: string) {
   };
 }
 
-export async function supabaseListSecurities() {
-  return (await catalog()).securities;
+export async function supabaseListSecurities(userId: string) {
+  return (await catalog(userId)).securities;
 }
 
-export async function supabaseGetSecurity(id: string) {
-  const security = (await catalog()).securities.find((item) => item.id === id);
+export async function supabaseGetSecurity(userId: string, id: string) {
+  const security = (await catalog(userId)).securities.find((item) => item.id === id);
   if (!security) {
     throwQueryError("Security not found", 404);
   }
@@ -405,13 +637,13 @@ export async function supabaseGetSecurity(id: string) {
 }
 
 export async function supabaseOverview(userId: string) {
-  const { investments, exposures } = await exposuresFor(userId);
-  return buildOverview(investments, exposures);
+  const { investments, exposures, fx } = await exposuresFor(userId);
+  return buildOverview(investments, exposures, fx);
 }
 
 export async function supabaseMarket(userId: string, country: "IN" | "US") {
-  const { investments, exposures } = await exposuresFor(userId);
-  return buildMarketDashboard(country, investments, exposures);
+  const { investments, exposures, fx } = await exposuresFor(userId);
+  return buildMarketDashboard(country, investments, exposures, fx.rate);
 }
 
 export async function supabaseExposure(userId: string) {
@@ -428,11 +660,10 @@ export async function supabaseExposureDetail(userId: string, securityId: string)
 
 export async function supabaseAllocation(userId: string) {
   const overview = await supabaseOverview(userId);
-  const rate = (await fxRate()).rate;
+  const rate = overview.fxRate.rate;
   return {
     market: overview.marketAllocation,
     type: overview.typeAllocation,
-    sector: overview.sectorAllocation,
     stocks: overview.topHoldings.map((item) => ({
       key: item.security.id,
       label: item.security.standardizedName,
@@ -458,50 +689,6 @@ export async function supabaseOverlap(userId: string) {
   }));
 }
 
-export async function supabaseDataSources() {
-  const supabase = await client();
-  const { data, error } = await supabase.from("data_sources").select("*").order("name");
-  if (error) {
-    throwQueryError("Unable to load data sources.", 500);
-  }
-  return (data ?? []).map(mapDataSource);
-}
-
-export async function supabaseRefreshSource(id: string) {
-  const supabase = await client();
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("data_sources")
-    .update({ last_scraped_at: now, last_successful_at: now, status: "fresh" })
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
-  if (error || !data) {
-    throwQueryError("Data source not found", 404);
-  }
-  await supabase.from("scraping_logs").insert({
-    data_source_id: id,
-    started_at: now,
-    completed_at: now,
-    status: "success",
-    records_processed: 0,
-  });
-  return mapDataSource(data);
-}
-
-export async function supabaseScrapingLogs() {
-  const supabase = await client();
-  const { data, error } = await supabase
-    .from("scraping_logs")
-    .select("*")
-    .order("started_at", { ascending: false })
-    .limit(50);
-  if (error) {
-    throwQueryError("Unable to load scraping logs.", 500);
-  }
-  return (data ?? []).map(mapLog);
-}
-
 export async function supabaseGetSettings(userId: string) {
   const user = await supabaseMe(userId);
   return { displayCurrency: user.displayCurrency };
@@ -524,44 +711,24 @@ export async function supabaseUpdateSettings(userId: string, displayCurrency: Cu
   return { displayCurrency: data.display_currency };
 }
 
-export async function supabaseFxRate() {
-  return fxRate();
+export async function supabaseFxRate(userId: string) {
+  return fxRate(userId);
 }
 
-export async function supabaseExtractUrl(userId: string, rawUrl: string) {
-  const extracted = await extractPublicUrl(rawUrl);
+export async function supabaseUpdateFxRate(userId: string, rate: number) {
+  if (!Number.isFinite(rate) || rate <= 0 || rate > 500) {
+    throwQueryError("Enter a USD/INR rate between 0 and 500.", 400);
+  }
   const supabase = await client();
+  const asOf = new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase
-    .from("url_extractions")
-    .insert({
-      user_id: userId,
-      url: extracted.url,
-      final_url: extracted.finalUrl,
-      title: extracted.title,
-      description: extracted.description,
-      content_text: extracted.text,
-      content_type: extracted.contentType,
-      status_code: extracted.statusCode,
-      extracted_at: extracted.extractedAt,
-    })
-    .select("*")
-    .single();
+    .from("profiles")
+    .update({ fx_usd_inr: rate, fx_as_of: asOf })
+    .eq("id", userId)
+    .select("fx_usd_inr, fx_as_of")
+    .maybeSingle();
   if (error || !data) {
-    throwQueryError("Unable to save extracted content.", 500);
+    throwQueryError("Unauthorized", 401);
   }
-  return mapUrlExtraction(data);
-}
-
-export async function supabaseListExtractions(userId: string) {
-  const supabase = await client();
-  const { data, error } = await supabase
-    .from("url_extractions")
-    .select("*")
-    .eq("user_id", userId)
-    .order("extracted_at", { ascending: false })
-    .limit(20);
-  if (error) {
-    throwQueryError("Unable to load extractions.", 500);
-  }
-  return (data ?? []).map(mapUrlExtraction);
+  return getFxRate({ rate: Number(data.fx_usd_inr), asOf: data.fx_as_of });
 }

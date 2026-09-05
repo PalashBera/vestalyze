@@ -31,3 +31,17 @@ export function typeLabel(type: InvestmentType): string {
 export function countryLabel(country: "IN" | "US"): string {
   return country === "IN" ? "India" : "United States";
 }
+
+export function formatTimestamp(value?: string): string {
+  if (!value) {
+    return "Never";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Never";
+  }
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}

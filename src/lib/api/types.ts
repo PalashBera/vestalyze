@@ -14,6 +14,8 @@ export interface User {
 
 export interface AuthUser extends User {
   passwordHash: string;
+  fxUsdInr: number;
+  fxAsOf: string;
 }
 
 export interface Session {
@@ -26,6 +28,7 @@ export interface Session {
 
 export interface Security {
   id: string;
+  userId: string;
   companyName: string;
   standardizedName: string;
   ticker: string;
@@ -39,6 +42,7 @@ export interface Security {
 
 export interface Fund {
   id: string;
+  userId: string;
   name: string;
   symbol: string;
   type: Exclude<InvestmentType, "stock">;
@@ -55,12 +59,11 @@ export interface Fund {
 
 export interface FundHolding {
   id: string;
+  userId: string;
   fundId: string;
   securityId: string;
   allocationPercentage: number;
   holdingDate: string;
-  shares?: number;
-  marketValue?: number;
   sourceId: string;
 }
 
@@ -74,36 +77,18 @@ export interface Investment {
   country: Country;
   currency: Currency;
   investedAmount: number;
-  currentValue: number;
   units?: number;
+  sourceUrl?: string;
+  lastSyncedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface InvestmentTransaction {
+export interface InvestmentSync {
   id: string;
+  userId: string;
   investmentId: string;
-  transactionDate: string;
-  units?: number;
-  purchasePrice?: number;
-  investedAmount: number;
-}
-
-export interface DataSource {
-  id: string;
-  name: string;
-  url: string;
-  type: "indian_mf" | "indian_etf" | "us_etf" | "factsheet";
-  lastScrapedAt: string;
-  lastSuccessfulAt?: string;
-  status: DataStatus;
-}
-
-export interface ScrapingLog {
-  id: string;
-  dataSourceId: string;
   startedAt: string;
-  completedAt?: string;
   status: ScrapeStatus;
   recordsProcessed: number;
   errorMessage?: string;
@@ -136,9 +121,7 @@ export interface ExposureBreakdown {
   currency: Currency;
   allocationPercentage?: number;
   investedExposureNative: number;
-  currentExposureNative: number;
   investedExposureInr: number;
-  currentExposureInr: number;
 }
 
 export interface StockExposure {
@@ -149,16 +132,12 @@ export interface StockExposure {
   indiaInvestedInr: number;
   usInvestedInr: number;
   totalInvestedInr: number;
-  totalCurrentInr: number;
   portfolioPercentage: number;
   breakdown: ExposureBreakdown[];
 }
 
 export interface PortfolioOverview {
   totalInvestedInr: number;
-  totalCurrentInr: number;
-  profitLossInr: number;
-  returnPercentage: number;
   indiaInvestedInr: number;
   usInvestedInr: number;
   mutualFundInvestedInr: number;
@@ -167,14 +146,12 @@ export interface PortfolioOverview {
   fxRate: FxRate;
   marketAllocation: AllocationSlice[];
   typeAllocation: AllocationSlice[];
-  sectorAllocation: AllocationSlice[];
   topHoldings: StockExposure[];
 }
 
 export interface MarketDashboard {
   country: Country;
   totalInvestedNative: number;
-  totalCurrentNative: number;
   currency: Currency;
   byType: {
     mutualFund: number;
@@ -216,24 +193,19 @@ export interface CreateInvestmentRequest {
   country: Country;
   currency: Currency;
   investedAmount: number;
-  currentValue: number;
   units?: number;
   fundId?: string;
   securityId?: string;
+  ticker?: string;
+  sector?: string;
+  sourceUrl?: string;
 }
 
 export interface UpdateInvestmentRequest {
   name?: string;
   investedAmount?: number;
-  currentValue?: number;
   units?: number;
-}
-
-export interface CreateTransactionRequest {
-  transactionDate: string;
-  investedAmount: number;
-  units?: number;
-  purchasePrice?: number;
+  sourceUrl?: string;
 }
 
 export interface ApiError {
@@ -251,17 +223,4 @@ export interface RefreshResult {
   recordsProcessed: number;
   lastScrapedAt: string;
   message: string;
-}
-
-export interface UrlExtractionRecord {
-  id: string;
-  userId: string;
-  url: string;
-  finalUrl: string;
-  title: string;
-  description: string;
-  text: string;
-  contentType: string;
-  statusCode: number;
-  extractedAt: string;
 }

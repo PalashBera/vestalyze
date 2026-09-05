@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { BrandLockup } from "@/components/brand-mark";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { APP_NAME } from "@/lib/brand";
 
 type Mode = "login" | "register";
 
@@ -33,8 +35,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
         await api.auth.register(name, email, password);
       }
       toast.success(mode === "login" ? "Welcome back" : "Account created");
-      const next = searchParams.get("next") ?? "/dashboard";
-      router.push(next.startsWith("/") ? next : "/dashboard");
+      const fallback = mode === "register" ? "/onboarding" : "/dashboard";
+      const next = searchParams.get("next") ?? fallback;
+      router.push(next.startsWith("/") ? next : fallback);
       router.refresh();
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Unable to continue";
@@ -47,7 +50,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <header className="flex items-center justify-between px-6 py-4">
-        <p className="font-heading text-sm">Look-Through</p>
+        <Link href="/" className="text-foreground">
+          <BrandLockup />
+        </Link>
         <ThemeToggle />
       </header>
       <main className="flex flex-1 items-center justify-center px-4 pb-16">
@@ -62,7 +67,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             <p className="text-sm text-muted-foreground">
               {mode === "login"
                 ? "Access your consolidated India and US portfolio."
-                : "Start tracking look-through stock exposure."}
+                : `Set up ${APP_NAME} with the holdings you already own.`}
             </p>
           </div>
           <FieldGroup>

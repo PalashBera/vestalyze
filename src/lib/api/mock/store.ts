@@ -1,30 +1,18 @@
 import { randomUUID } from "node:crypto";
-import type {
-  AuthUser,
-  Investment,
-  InvestmentTransaction,
-  Session,
-  UrlExtractionRecord,
-} from "@/lib/api/types";
+import type { AuthUser, Fund, FundHolding, Investment, InvestmentSync, Security, Session } from "@/lib/api/types";
 import { hashPassword } from "@/lib/auth/password";
-import {
-  DEMO_USER_ID,
-  dataSources,
-  funds,
-  holdings,
-  scrapingLogs,
-  securities,
-  seedInvestments,
-  seedTransactions,
-} from "@/lib/api/mock/data";
+import { DEMO_USER_ID } from "@/lib/api/mock/data";
+import { FX_AS_OF, FX_USD_INR } from "@/lib/finance/currency";
 
 type Store = {
   users: Map<string, AuthUser>;
   usersByEmail: Map<string, string>;
   sessions: Map<string, Session>;
   investments: Investment[];
-  transactions: InvestmentTransaction[];
-  urlExtractions: UrlExtractionRecord[];
+  securities: Security[];
+  funds: Fund[];
+  holdings: FundHolding[];
+  syncs: InvestmentSync[];
   seeded: boolean;
 };
 
@@ -35,9 +23,11 @@ function createStore(): Store {
     users: new Map(),
     usersByEmail: new Map(),
     sessions: new Map(),
-    investments: structuredClone(seedInvestments),
-    transactions: structuredClone(seedTransactions),
-    urlExtractions: [],
+    investments: [],
+    securities: [],
+    funds: [],
+    holdings: [],
+    syncs: [],
     seeded: false,
   };
 }
@@ -69,8 +59,10 @@ export async function ensureDemoUser(): Promise<void> {
   const user: AuthUser = {
     id: DEMO_USER_ID,
     email,
-    name: "Demo Investor",
+    name: "Investor",
     displayCurrency: "INR",
+    fxUsdInr: FX_USD_INR,
+    fxAsOf: FX_AS_OF,
     createdAt: "2023-01-01T00:00:00.000Z",
     passwordHash: await hashPassword(password),
   };
@@ -78,13 +70,12 @@ export async function ensureDemoUser(): Promise<void> {
   store.usersByEmail.set(email, user.id);
 }
 
-export function publicCatalog() {
+export function userCatalog(userId: string) {
+  const store = getStore();
   return {
-    funds: structuredClone(funds),
-    holdings: structuredClone(holdings),
-    securities: structuredClone(securities),
-    dataSources: structuredClone(dataSources),
-    scrapingLogs: structuredClone(scrapingLogs),
+    funds: structuredClone(store.funds.filter((item) => item.userId === userId)),
+    holdings: structuredClone(store.holdings.filter((item) => item.userId === userId)),
+    securities: structuredClone(store.securities.filter((item) => item.userId === userId)),
   };
 }
 

@@ -1,18 +1,15 @@
 import type {
   AllocationSlice,
   CreateInvestmentRequest,
-  DataSource,
   Fund,
   FundHolding,
   FundOverlap,
   FxRate,
   Investment,
-  InvestmentTransaction,
+  InvestmentSync,
   MarketDashboard,
   PortfolioOverview,
-  ScrapingLog,
   Security,
-  UrlExtractionRecord,
   StockExposure,
   User,
   UserSettings,
@@ -24,6 +21,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
+      "Cache-Control": "no-cache",
       ...(init?.headers ?? {}),
     },
     cache: "no-store",
@@ -59,8 +57,8 @@ export const api = {
         fund?: Fund;
         security?: Security;
         holdings: Array<FundHolding & { security?: Security }>;
-        transactions: InvestmentTransaction[];
-      }>(`/investments/${id}`),
+        syncs: InvestmentSync[];
+      }>(`/investments/${id}?t=${Date.now()}`),
     create: (input: CreateInvestmentRequest) =>
       request<{ investment: Investment }>("/investments", {
         method: "POST",
@@ -73,6 +71,14 @@ export const api = {
       }),
     remove: (id: string) =>
       request<{ ok: boolean }>(`/investments/${id}`, { method: "DELETE" }),
+    sync: (id: string) =>
+      request<{
+        investment: Investment;
+        sync: InvestmentSync;
+        recordsProcessed: number;
+      }>(`/investments/${id}/sync`, { method: "POST" }),
+    syncs: (id: string) =>
+      request<{ syncs: InvestmentSync[] }>(`/investments/${id}/syncs`),
   },
   portfolio: {
     overview: () => request<PortfolioOverview>("/portfolio/overview"),
@@ -85,7 +91,6 @@ export const api = {
       request<{
         market: AllocationSlice[];
         type: AllocationSlice[];
-        sector: AllocationSlice[];
         stocks: AllocationSlice[];
       }>("/portfolio/allocation"),
     overlap: () => request<{ overlaps: FundOverlap[] }>("/portfolio/overlap"),
@@ -94,21 +99,7 @@ export const api = {
     funds: () => request<{ funds: Fund[] }>("/funds"),
     fund: (id: string) =>
       request<{ fund: Fund; holdings: Array<FundHolding & { security?: Security }> }>(`/funds/${id}`),
-    refreshFund: (id: string) =>
-      request(`/funds/${id}/refresh`, { method: "POST" }),
     securities: () => request<{ securities: Security[] }>("/securities"),
-  },
-  ops: {
-    dataSources: () => request<{ dataSources: DataSource[] }>("/data-sources"),
-    refreshSource: (id: string) =>
-      request<DataSource>(`/data-sources/${id}/refresh`, { method: "POST" }),
-    logs: () => request<{ logs: ScrapingLog[] }>("/scraping-logs"),
-    extract: (url: string) =>
-      request<{ extraction: UrlExtractionRecord }>("/extract", {
-        method: "POST",
-        body: JSON.stringify({ url }),
-      }),
-    extractions: () => request<{ extractions: UrlExtractionRecord[] }>("/extract"),
   },
   settings: {
     get: () => request<UserSettings>("/settings"),
@@ -118,5 +109,10 @@ export const api = {
         body: JSON.stringify({ displayCurrency }),
       }),
     fx: () => request<FxRate>("/fx/rate"),
+    updateFx: (rate: number) =>
+      request<FxRate>("/fx/rate", {
+        method: "PATCH",
+        body: JSON.stringify({ rate }),
+      }),
   },
 };

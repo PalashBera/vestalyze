@@ -7,7 +7,7 @@ import { useSettings } from "@/components/settings-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/page-loader";
 import {
   Table,
   TableBody,
@@ -30,7 +30,7 @@ export default function ExposureDetailPage({
   const { data, error, loading } = useAsync(() => api.portfolio.exposureDetail(securityId), [securityId]);
 
   if (loading) {
-    return <Skeleton className="h-80" />;
+    return <PageLoader />;
   }
 
   if (error || !data) {
@@ -48,10 +48,6 @@ export default function ExposureDetailPage({
         title={data.security.standardizedName}
         description={`${data.security.companyName} · ${data.security.exchange} · ${data.security.sector}`}
       />
-      <div className="flex flex-wrap gap-2">
-        <Badge variant="secondary">{data.security.ticker}</Badge>
-        {data.security.isin ? <Badge variant="outline">{data.security.isin}</Badge> : null}
-      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Total exposure" value={money(data.totalInvestedInr)} hint={`${formatPercent(data.portfolioPercentage)} of portfolio`} />
         <StatCard label="Direct" value={money(data.directInvestedInr)} />

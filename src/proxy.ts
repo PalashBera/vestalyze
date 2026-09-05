@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/constants";
 
-const PUBLIC_PATHS = new Set(["/login", "/register"]);
+const PUBLIC_PATHS = new Set(["/", "/login", "/register"]);
 
 function hasSessionCookie(request: NextRequest): boolean {
   if (request.cookies.get(SESSION_COOKIE)?.value) {
@@ -31,12 +31,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (hasSession && (isPublic || pathname === "/")) {
+  if (hasSession && (pathname === "/login" || pathname === "/register")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  if (!hasSession && pathname === "/") {
-    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return NextResponse.next();

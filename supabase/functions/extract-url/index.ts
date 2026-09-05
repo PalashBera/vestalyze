@@ -182,7 +182,7 @@ async function extractPublicUrl(rawUrl: string) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: {
         Accept: "text/html,application/xhtml+xml,text/plain,application/xml;q=0.9",
-        "User-Agent": "LookThroughPortfolio/0.1 (personal research extractor)",
+        "User-Agent": "InvestmentPortfolio/0.1 (personal research extractor)",
       },
     });
     statusCode = response.status;

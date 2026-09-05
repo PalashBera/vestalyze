@@ -4,11 +4,7 @@ import { isSupabaseEnabled } from "@/lib/api/provider";
 import {
   mockAllocation,
   mockCreateInvestment,
-  mockCreateTransaction,
-  mockDataSources,
   mockDeleteInvestment,
-  mockExtractUrl,
-  mockDeleteTransaction,
   mockExposure,
   mockExposureDetail,
   mockFxRate,
@@ -16,10 +12,10 @@ import {
   mockGetInvestment,
   mockGetSecurity,
   mockGetSettings,
-  mockListExtractions,
   mockListFunds,
   mockListInvestments,
   mockListSecurities,
+  mockListSyncs,
   mockLogin,
   mockLogout,
   mockMarket,
@@ -27,20 +23,16 @@ import {
   mockOverlap,
   mockOverview,
   mockRefreshFund,
-  mockRefreshSource,
   mockRegister,
-  mockScrapingLogs,
+  mockSyncInvestment,
+  mockUpdateFxRate,
   mockUpdateInvestment,
   mockUpdateSettings,
 } from "@/lib/api/mock/handlers";
 import {
   supabaseAllocation,
   supabaseCreateInvestment,
-  supabaseCreateTransaction,
-  supabaseDataSources,
   supabaseDeleteInvestment,
-  supabaseExtractUrl,
-  supabaseDeleteTransaction,
   supabaseExposure,
   supabaseExposureDetail,
   supabaseFxRate,
@@ -48,10 +40,10 @@ import {
   supabaseGetInvestment,
   supabaseGetSecurity,
   supabaseGetSettings,
-  supabaseListExtractions,
   supabaseListFunds,
   supabaseListInvestments,
   supabaseListSecurities,
+  supabaseListSyncs,
   supabaseLogin,
   supabaseLogout,
   supabaseMarket,
@@ -59,9 +51,9 @@ import {
   supabaseOverlap,
   supabaseOverview,
   supabaseRefreshFund,
-  supabaseRefreshSource,
   supabaseRegister,
-  supabaseScrapingLogs,
+  supabaseSyncInvestment,
+  supabaseUpdateFxRate,
   supabaseUpdateInvestment,
   supabaseUpdateSettings,
 } from "@/lib/api/supabase/handlers";
@@ -181,61 +173,56 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
     );
   }
 
-  const txnListMatch = path.match(/^investments\/([^/]+)\/transactions$/);
-  if (txnListMatch && method === "GET") {
-    const detail = useSupabase
-      ? await supabaseGetInvestment(userId, txnListMatch[1])
-      : mockGetInvestment(userId, txnListMatch[1]);
-    return jsonOk({ transactions: detail.transactions });
-  }
-  if (txnListMatch && method === "POST") {
-    const input = await request.json();
-    return jsonOk(
-      {
-        transaction: useSupabase
-          ? await supabaseCreateTransaction(userId, txnListMatch[1], input)
-          : mockCreateTransaction(userId, txnListMatch[1], input),
-      },
-      { status: 201 },
-    );
-  }
-
-  const txnDeleteMatch = path.match(/^transactions\/([^/]+)$/);
-  if (txnDeleteMatch && method === "DELETE") {
+  const investmentSyncMatch = path.match(/^investments\/([^/]+)\/sync$/);
+  if (investmentSyncMatch && method === "POST") {
+    const limit = consumeExtractAttempt(`sync:${clientKey(request)}`);
+    if (!limit.allowed) {
+      return jsonError("Too many sync attempts. Try again later.", 429);
+    }
     return jsonOk(
       useSupabase
-        ? await supabaseDeleteTransaction(userId, txnDeleteMatch[1])
-        : mockDeleteTransaction(userId, txnDeleteMatch[1]),
+        ? await supabaseSyncInvestment(userId, investmentSyncMatch[1])
+        : await mockSyncInvestment(userId, investmentSyncMatch[1]),
     );
+  }
+  const investmentSyncsMatch = path.match(/^investments\/([^/]+)\/syncs$/);
+  if (investmentSyncsMatch && method === "GET") {
+    return jsonOk({
+      syncs: useSupabase
+        ? await supabaseListSyncs(userId, investmentSyncsMatch[1])
+        : mockListSyncs(userId, investmentSyncsMatch[1]),
+    });
   }
 
   if (path === "funds" && method === "GET") {
-    return jsonOk({ funds: useSupabase ? await supabaseListFunds() : mockListFunds() });
+    return jsonOk({ funds: useSupabase ? await supabaseListFunds(userId) : mockListFunds(userId) });
   }
 
   const fundMatch = path.match(/^funds\/([^/]+)$/);
   if (fundMatch && method === "GET") {
-    return jsonOk(useSupabase ? await supabaseGetFund(fundMatch[1]) : mockGetFund(fundMatch[1]));
+    return jsonOk(useSupabase ? await supabaseGetFund(userId, fundMatch[1]) : mockGetFund(userId, fundMatch[1]));
   }
 
   const fundHoldingsMatch = path.match(/^funds\/([^/]+)\/holdings$/);
   if (fundHoldingsMatch && method === "GET") {
     const detail = useSupabase
-      ? await supabaseGetFund(fundHoldingsMatch[1])
-      : mockGetFund(fundHoldingsMatch[1]);
+      ? await supabaseGetFund(userId, fundHoldingsMatch[1])
+      : mockGetFund(userId, fundHoldingsMatch[1]);
     return jsonOk({ holdings: detail.holdings });
   }
 
   const fundRefreshMatch = path.match(/^funds\/([^/]+)\/refresh$/);
   if (fundRefreshMatch && method === "POST") {
     return jsonOk(
-      useSupabase ? await supabaseRefreshFund(fundRefreshMatch[1]) : mockRefreshFund(fundRefreshMatch[1]),
+      useSupabase
+        ? await supabaseRefreshFund(userId, fundRefreshMatch[1])
+        : mockRefreshFund(userId, fundRefreshMatch[1]),
     );
   }
 
   if (path === "securities" && method === "GET") {
     return jsonOk({
-      securities: useSupabase ? await supabaseListSecurities() : mockListSecurities(),
+      securities: useSupabase ? await supabaseListSecurities(userId) : mockListSecurities(userId),
     });
   }
 
@@ -243,8 +230,8 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
   if (securityMatch && method === "GET") {
     return jsonOk({
       security: useSupabase
-        ? await supabaseGetSecurity(securityMatch[1])
-        : mockGetSecurity(securityMatch[1]),
+        ? await supabaseGetSecurity(userId, securityMatch[1])
+        : mockGetSecurity(userId, securityMatch[1]),
     });
   }
 
@@ -279,40 +266,6 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
     });
   }
 
-  if (path === "extract" && method === "POST") {
-    const limit = consumeExtractAttempt(`extract:${clientKey(request)}`);
-    if (!limit.allowed) {
-      return jsonError("Too many extract attempts. Try again later.", 429);
-    }
-    const body = (await request.json()) as { url?: string };
-    const extraction = useSupabase
-      ? await supabaseExtractUrl(userId, body.url ?? "")
-      : await mockExtractUrl(userId, body.url ?? "");
-    return jsonOk({ extraction }, { status: 201 });
-  }
-  if (path === "extract" && method === "GET") {
-    return jsonOk({
-      extractions: useSupabase ? await supabaseListExtractions(userId) : mockListExtractions(userId),
-    });
-  }
-
-  if (path === "data-sources" && method === "GET") {
-    return jsonOk({
-      dataSources: useSupabase ? await supabaseDataSources() : mockDataSources(),
-    });
-  }
-  const sourceRefreshMatch = path.match(/^data-sources\/([^/]+)\/refresh$/);
-  if (sourceRefreshMatch && method === "POST") {
-    return jsonOk(
-      useSupabase
-        ? await supabaseRefreshSource(sourceRefreshMatch[1])
-        : mockRefreshSource(sourceRefreshMatch[1]),
-    );
-  }
-  if (path === "scraping-logs" && method === "GET") {
-    return jsonOk({ logs: useSupabase ? await supabaseScrapingLogs() : mockScrapingLogs() });
-  }
-
   if (path === "settings" && method === "GET") {
     return jsonOk(useSupabase ? await supabaseGetSettings(userId) : await mockGetSettings(userId));
   }
@@ -324,7 +277,14 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
     );
   }
   if (path === "fx/rate" && method === "GET") {
-    return jsonOk(useSupabase ? await supabaseFxRate() : mockFxRate());
+    return jsonOk(useSupabase ? await supabaseFxRate(userId) : mockFxRate(userId));
+  }
+  if (path === "fx/rate" && method === "PATCH") {
+    const body = (await request.json()) as { rate?: number };
+    const rate = Number(body.rate);
+    return jsonOk(
+      useSupabase ? await supabaseUpdateFxRate(userId, rate) : mockUpdateFxRate(userId, rate),
+    );
   }
 
   return jsonError("Not found", 404);

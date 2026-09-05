@@ -2,9 +2,9 @@
 
 import { PageHeader } from "@/components/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/page-loader";
+import { PlaceholderPreview } from "@/components/placeholder-preview";
 import {
   Table,
   TableBody,
@@ -21,7 +21,7 @@ export default function OverlapPage() {
   const { data, error, loading } = useAsync(() => api.portfolio.overlap());
 
   if (loading) {
-    return <Skeleton className="h-80" />;
+    return <PageLoader />;
   }
 
   if (error || !data) {
@@ -39,6 +39,39 @@ export default function OverlapPage() {
         title="Fund overlap"
         description="Shared underlying stocks between the mutual funds and ETFs you hold."
       />
+      {data.overlaps.length === 0 ? (
+        <PlaceholderPreview description="Add at least two funds or ETFs with shared holdings to see overlap.">
+          <Card>
+            <CardHeader>
+              <CardTitle>Flexi Cap × Nasdaq 100</CardTitle>
+              <CardDescription>Overlap score 12.4%</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Company</TableHead>
+                    <TableHead className="text-right">Fund A</TableHead>
+                    <TableHead className="text-right">Fund B</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Microsoft</TableCell>
+                    <TableCell className="text-right">5.0%</TableCell>
+                    <TableCell className="text-right">8.1%</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Amazon</TableCell>
+                    <TableCell className="text-right">5.5%</TableCell>
+                    <TableCell className="text-right">5.2%</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </PlaceholderPreview>
+      ) : null}
       {data.overlaps.map((overlap) => (
         <Card key={`${overlap.fundAId}-${overlap.fundBId}`}>
           <CardHeader>
@@ -59,12 +92,7 @@ export default function OverlapPage() {
               <TableBody>
                 {overlap.overlappingSecurities.map((item) => (
                   <TableRow key={item.securityId}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span>{item.name}</span>
-                        <Badge variant="secondary">{item.ticker}</Badge>
-                      </div>
-                    </TableCell>
+                    <TableCell>{item.name}</TableCell>
                     <TableCell className="text-right">{formatPercent(item.allocationA)}</TableCell>
                     <TableCell className="text-right">{formatPercent(item.allocationB)}</TableCell>
                   </TableRow>

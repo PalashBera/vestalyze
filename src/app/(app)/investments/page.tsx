@@ -1,21 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { InvestmentForm } from "@/components/investment-form";
+import { InvestmentForm, SyncInvestmentButton } from "@/components/investment-form";
 import { PageHeader } from "@/components/page-header";
 import { useSettings } from "@/components/settings-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageLoader } from "@/components/page-loader";
+import { PlaceholderPreview } from "@/components/placeholder-preview";
 import {
   Table,
   TableBody,
@@ -26,15 +20,14 @@ import {
 } from "@/components/ui/table";
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
-import { countryLabel, formatPercent, typeLabel } from "@/lib/format";
-import { WalletIcon } from "lucide-react";
+import { countryLabel, formatTimestamp, typeLabel } from "@/lib/format";
 
 export default function InvestmentsPage() {
   const { moneyNative } = useSettings();
   const { data, error, loading, reload } = useAsync(() => api.investments.list());
 
   if (loading) {
-    return <Skeleton className="h-80" />;
+    return <PageLoader />;
   }
 
   if (error || !data) {
@@ -50,19 +43,43 @@ export default function InvestmentsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Investments"
-        description="Every mutual fund, ETF, and direct stock with invested amount and current value."
-        actions={<InvestmentForm onCreated={() => void reload()} />}
+        description="Mutual funds, ETFs, and stocks with invested amount, units, and last holdings sync."
+        actions={<InvestmentForm onSaved={() => void reload()} />}
       />
       {data.investments.length === 0 ? (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <WalletIcon />
-            </EmptyMedia>
-            <EmptyTitle>No investments yet</EmptyTitle>
-            <EmptyDescription>Add a fund, ETF, or stock to start look-through analysis.</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <PlaceholderPreview description="Add a fund, ETF, or stock — nothing is preloaded.">
+          <Card>
+            <CardContent className="overflow-x-auto pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Investment</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Country</TableHead>
+                    <TableHead className="text-right">Invested</TableHead>
+                    <TableHead>Last sync</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Bandhan Small Cap Fund</TableCell>
+                    <TableCell>Mutual Fund</TableCell>
+                    <TableCell>India</TableCell>
+                    <TableCell className="text-right">₹10,00,000</TableCell>
+                    <TableCell>Never</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Apple</TableCell>
+                    <TableCell>Stock</TableCell>
+                    <TableCell>United States</TableCell>
+                    <TableCell className="text-right">$5,000</TableCell>
+                    <TableCell>—</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </PlaceholderPreview>
       ) : (
         <Card>
           <CardContent className="overflow-x-auto pt-6">
@@ -73,44 +90,43 @@ export default function InvestmentsPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Country</TableHead>
                   <TableHead className="text-right">Invested</TableHead>
-                  <TableHead className="text-right">Current</TableHead>
-                  <TableHead className="text-right">Return</TableHead>
+                  <TableHead className="text-right">Units</TableHead>
+                  <TableHead>Last sync</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.investments.map((item) => {
-                  const ret =
-                    item.investedAmount > 0
-                      ? ((item.currentValue - item.investedAmount) / item.investedAmount) * 100
-                      : 0;
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <Button
-                          variant="link"
-                          className="h-auto px-0"
-                          nativeButton={false}
-                          render={<Link href={`/investments/${item.id}`} />}
-                        >
-                          {item.name}
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{typeLabel(item.type)}</Badge>
-                      </TableCell>
-                      <TableCell>{countryLabel(item.country)}</TableCell>
-                      <TableCell className="text-right">
-                        {moneyNative(item.investedAmount, item.currency)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {moneyNative(item.currentValue, item.currency)}
-                      </TableCell>
-                      <TableCell className={ret >= 0 ? "text-right text-gain" : "text-right text-destructive"}>
-                        {formatPercent(ret)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {data.investments.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <Button
+                        variant="link"
+                        className="h-auto px-0"
+                        nativeButton={false}
+                        render={<Link href={`/investments/${item.id}`} />}
+                      >
+                        {item.name}
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{typeLabel(item.type)}</Badge>
+                    </TableCell>
+                    <TableCell>{countryLabel(item.country)}</TableCell>
+                    <TableCell className="text-right">
+                      {moneyNative(item.investedAmount, item.currency)}
+                    </TableCell>
+                    <TableCell className="text-right">{item.units ?? "—"}</TableCell>
+                    <TableCell>
+                      {item.type === "stock" ? "—" : formatTimestamp(item.lastSyncedAt)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <InvestmentForm investment={item} onSaved={() => void reload()} />
+                        <SyncInvestmentButton investment={item} onSynced={() => reload()} />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>

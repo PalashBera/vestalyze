@@ -1,6 +1,7 @@
 "use client";
 
-import { MoonIcon, SunIcon, ContrastIcon } from "lucide-react";
+import { useEffect } from "react";
+import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,11 +15,17 @@ import {
 const themes = [
   { value: "light", label: "Light", icon: SunIcon },
   { value: "dark", label: "Dark", icon: MoonIcon },
-  { value: "black", label: "Black", icon: ContrastIcon },
+  { value: "system", label: "System", icon: MonitorIcon },
 ] as const;
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+
+  useEffect(() => {
+    if (theme === "black") {
+      setTheme("dark");
+    }
+  }, [theme, setTheme]);
 
   return (
     <DropdownMenu>

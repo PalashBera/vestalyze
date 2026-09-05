@@ -2,12 +2,28 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 const MAX_URL_LENGTH = 2048;
-const MAX_BYTES = 1_500_000;
+const MAX_BYTES = 3_000_000;
 const MAX_REDIRECTS = 3;
-const TIMEOUT_MS = 10_000;
+const TIMEOUT_MS = 20_000;
 const MAX_TEXT = 20_000;
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 const BLOCKED_HOST_SUFFIXES = [".localhost", ".local", ".internal", ".intranet", ".arpa"];
+
+const BROWSER_HEADERS = {
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+  "Cache-Control": "max-age=0",
+  "Upgrade-Insecure-Requests": "1",
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"macOS"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+};
 
 export type UrlExtraction = {
   url: string;
@@ -119,7 +135,7 @@ function decodeHtml(value: string): string {
     .replace(/&#39;/gi, "'");
 }
 
-function extractFromHtml(html: string): { title: string; description: string; text: string } {
+export function extractFromHtml(html: string): { title: string; description: string; text: string } {
   const withoutNoise = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -161,7 +177,12 @@ async function readLimited(response: Response): Promise<string> {
   return new TextDecoder("utf-8").decode(Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))));
 }
 
-export async function extractPublicUrl(rawUrl: string): Promise<UrlExtraction> {
+export async function fetchPublicHtml(rawUrl: string): Promise<{
+  html: string;
+  finalUrl: string;
+  statusCode: number;
+  contentType: string;
+}> {
   let current = await assertPublicUrl(rawUrl.trim());
   let statusCode = 0;
   let contentType = "";
@@ -174,8 +195,7 @@ export async function extractPublicUrl(rawUrl: string): Promise<UrlExtraction> {
       redirect: "manual",
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: {
-        Accept: "text/html,application/xhtml+xml,text/plain,application/xml;q=0.9",
-        "User-Agent": "LookThroughPortfolio/0.1 (personal research extractor)",
+        ...BROWSER_HEADERS,
       },
     });
     statusCode = response.status;
@@ -195,6 +215,13 @@ export async function extractPublicUrl(rawUrl: string): Promise<UrlExtraction> {
     }
 
     if (!response.ok) {
+      const html = await readLimited(response).catch(() => "");
+      if (/just a moment|cf-browser-verification|challenge-platform/i.test(html)) {
+        throw Object.assign(
+          new Error("The fund page is protected. Open the URL once in a browser, then try sync again."),
+          { status: 400 },
+        );
+      }
       throw Object.assign(new Error("The page could not be fetched."), { status: 400 });
     }
     const allowedTypes = ["text/html", "application/xhtml+xml", "text/plain", "application/xml", "text/xml"];
@@ -205,16 +232,29 @@ export async function extractPublicUrl(rawUrl: string): Promise<UrlExtraction> {
     break;
   }
 
-  const parsed = contentType === "text/plain" ? { title: "", description: "", text: body.slice(0, MAX_TEXT) } : extractFromHtml(body);
+  return {
+    html: body,
+    finalUrl: current.toString(),
+    statusCode,
+    contentType: contentType || "text/html",
+  };
+}
+
+export async function extractPublicUrl(rawUrl: string): Promise<UrlExtraction> {
+  const page = await fetchPublicHtml(rawUrl);
+  const parsed =
+    page.contentType === "text/plain"
+      ? { title: "", description: "", text: page.html.slice(0, MAX_TEXT) }
+      : extractFromHtml(page.html);
 
   return {
     url: rawUrl.trim(),
-    finalUrl: current.toString(),
+    finalUrl: page.finalUrl,
     title: parsed.title,
     description: parsed.description,
     text: parsed.text,
-    contentType: contentType || "text/html",
-    statusCode,
+    contentType: page.contentType,
+    statusCode: page.statusCode,
     extractedAt: new Date().toISOString(),
   };
 }
