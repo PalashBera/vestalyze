@@ -7,15 +7,11 @@ export function mapSecurity(row: Tables["securities"]["Row"]): Security {
   return {
     id: row.id,
     userId: row.user_id,
-    companyName: row.company_name,
     standardizedName: row.standardized_name,
     ticker: row.ticker,
-    isin: row.isin ?? undefined,
-    exchange: row.exchange,
     country: row.country,
     currency: row.currency,
     sector: row.sector,
-    industry: row.industry,
   };
 }
 
@@ -24,17 +20,12 @@ export function mapFund(row: Tables["funds"]["Row"]): Fund {
     id: row.id,
     userId: row.user_id,
     name: row.name,
-    symbol: row.symbol,
     type: row.type,
-    fundHouse: row.fund_house,
-    category: row.category,
     country: row.country,
     currency: row.currency,
     latestPortfolioDate: row.latest_portfolio_date,
-    sourceWebsite: row.source_website,
     sourceUrl: row.source_url,
     lastScrapedAt: row.last_scraped_at,
-    dataStatus: row.data_status,
   };
 }
 
@@ -46,7 +37,6 @@ export function mapHolding(row: Tables["fund_holdings"]["Row"]): FundHolding {
     securityId: row.security_id,
     allocationPercentage: Number(row.allocation_percentage),
     holdingDate: row.holding_date,
-    sourceId: row.source_id,
   };
 }
 
@@ -65,7 +55,6 @@ export function mapInvestment(row: Tables["investments"]["Row"]): Investment {
     sourceUrl: row.source_url ?? undefined,
     lastSyncedAt: row.last_synced_at ?? undefined,
     createdAt: row.created_at,
-    updatedAt: row.updated_at,
   };
 }
 

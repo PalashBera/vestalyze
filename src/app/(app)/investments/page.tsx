@@ -21,6 +21,7 @@ import {
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import { countryLabel, formatTimestamp, typeLabel } from "@/lib/format";
+import { placeholderInvestments } from "@/lib/placeholder/portfolio";
 
 export default function InvestmentsPage() {
   const { moneyNative } = useSettings();
@@ -47,7 +48,7 @@ export default function InvestmentsPage() {
         actions={<InvestmentForm onSaved={() => void reload()} />}
       />
       {data.investments.length === 0 ? (
-        <PlaceholderPreview description="Add a fund, ETF, or stock — nothing is preloaded.">
+        <PlaceholderPreview description="Add a fund, ETF, or stock — nothing is preloaded. This is how your book will look.">
           <Card>
             <CardContent className="overflow-x-auto pt-6">
               <Table>
@@ -57,24 +58,21 @@ export default function InvestmentsPage() {
                     <TableHead>Type</TableHead>
                     <TableHead>Country</TableHead>
                     <TableHead className="text-right">Invested</TableHead>
+                    <TableHead className="text-right">Units</TableHead>
                     <TableHead>Last sync</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell>Bandhan Small Cap Fund</TableCell>
-                    <TableCell>Mutual Fund</TableCell>
-                    <TableCell>India</TableCell>
-                    <TableCell className="text-right">₹10,00,000</TableCell>
-                    <TableCell>Never</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Apple</TableCell>
-                    <TableCell>Stock</TableCell>
-                    <TableCell>United States</TableCell>
-                    <TableCell className="text-right">$5,000</TableCell>
-                    <TableCell>—</TableCell>
-                  </TableRow>
+                  {placeholderInvestments.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.name}</TableCell>
+                      <TableCell>{typeLabel(item.type)}</TableCell>
+                      <TableCell>{countryLabel(item.country)}</TableCell>
+                      <TableCell className="text-right">{item.invested}</TableCell>
+                      <TableCell className="text-right">{item.units}</TableCell>
+                      <TableCell>{item.lastSync}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>

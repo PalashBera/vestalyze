@@ -19,14 +19,11 @@ export function buildSecurityFromCompany(userId: string, name: string, country: 
   return {
     id: securityIdFor(userId, slug, country),
     userId,
-    companyName: name.trim(),
     standardizedName: name.trim(),
     ticker: slug.toUpperCase(),
-    exchange: country === "IN" ? "NSE" : "NASDAQ",
     country,
     currency: (country === "IN" ? "INR" : "USD") as Currency,
     sector: "Uncategorized",
-    industry: "Uncategorized",
   };
 }
 
@@ -38,18 +35,13 @@ export function buildSecurityFromInput(input: CreateInvestmentRequest, userId: s
   if (!ticker || ticker.length > 16) {
     return null;
   }
-  const name = input.name.trim();
-  const sector = input.sector?.trim() || "Uncategorized";
   return {
     id: securityIdFor(userId, ticker, input.country),
     userId,
-    companyName: name,
-    standardizedName: name,
+    standardizedName: input.name.trim(),
     ticker,
-    exchange: input.country === "IN" ? "NSE" : "NASDAQ",
     country: input.country,
     currency: (input.country === "IN" ? "INR" : "USD") as Currency,
-    sector,
-    industry: sector,
+    sector: input.sector?.trim() || "Uncategorized",
   };
 }

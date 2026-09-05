@@ -69,17 +69,12 @@ function ensureMockFund(
     id: createId("fund"),
     userId,
     name: input.name,
-    symbol: input.name.slice(0, 12).toUpperCase(),
     type: input.type,
-    fundHouse: new URL(input.sourceUrl).hostname,
-    category: "Uncategorized",
     country: input.country,
     currency: input.currency,
     latestPortfolioDate: now.slice(0, 10),
-    sourceWebsite: new URL(input.sourceUrl).hostname,
     sourceUrl: input.sourceUrl,
     lastScrapedAt: now,
-    dataStatus: "pending",
   };
   store.funds.push(fund);
   return fund;
@@ -264,7 +259,6 @@ export function mockCreateInvestment(userId: string, input: CreateInvestmentRequ
     units: input.units,
     sourceUrl: sourceUrl || undefined,
     createdAt: now,
-    updatedAt: now,
   };
   getStore().investments.push(investment);
   return investment;
@@ -304,7 +298,6 @@ export function mockUpdateInvestment(userId: string, id: string, input: UpdateIn
       }).id;
     }
   }
-  investment.updatedAt = new Date().toISOString();
   return investment;
 }
 
@@ -361,13 +354,11 @@ export async function mockSyncInvestment(userId: string, id: string) {
         securityId: security.id,
         allocationPercentage: item.allocationPercentage,
         holdingDate: scraped.holdingDate,
-        sourceId: "indmoney-holdings",
       };
     });
     store.holdings.push(...holdings);
     fund.lastScrapedAt = new Date().toISOString();
     fund.latestPortfolioDate = scraped.holdingDate;
-    fund.dataStatus = "fresh";
     const completedAt = new Date().toISOString();
     for (const row of store.investments.filter((item) => item.fundId === fund.id && item.userId === userId)) {
       row.lastSyncedAt = completedAt;

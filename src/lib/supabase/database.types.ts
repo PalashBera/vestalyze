@@ -32,15 +32,11 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          company_name: string;
           standardized_name: string;
           ticker: string;
-          isin: string | null;
-          exchange: string;
           country: "IN" | "US";
           currency: "INR" | "USD";
           sector: string;
-          industry: string;
         };
         Insert: Database["public"]["Tables"]["securities"]["Row"];
         Update: Partial<Database["public"]["Tables"]["securities"]["Row"]>;
@@ -51,17 +47,12 @@ export type Database = {
           id: string;
           user_id: string;
           name: string;
-          symbol: string;
           type: "mutual_fund" | "etf";
-          fund_house: string;
-          category: string;
           country: "IN" | "US";
           currency: "INR" | "USD";
           latest_portfolio_date: string;
-          source_website: string;
           source_url: string;
           last_scraped_at: string;
-          data_status: "fresh" | "stale" | "failed" | "pending";
         };
         Insert: Database["public"]["Tables"]["funds"]["Row"];
         Update: Partial<Database["public"]["Tables"]["funds"]["Row"]>;
@@ -75,7 +66,6 @@ export type Database = {
           security_id: string;
           allocation_percentage: number;
           holding_date: string;
-          source_id: string;
         };
         Insert: Database["public"]["Tables"]["fund_holdings"]["Row"];
         Update: Partial<Database["public"]["Tables"]["fund_holdings"]["Row"]>;
@@ -96,7 +86,6 @@ export type Database = {
           source_url: string | null;
           last_synced_at: string | null;
           created_at: string;
-          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -112,7 +101,6 @@ export type Database = {
           source_url?: string | null;
           last_synced_at?: string | null;
           created_at?: string;
-          updated_at?: string;
         };
         Update: {
           name?: string;
@@ -121,7 +109,6 @@ export type Database = {
           source_url?: string | null;
           last_synced_at?: string | null;
           fund_id?: string | null;
-          updated_at?: string;
         };
         Relationships: [];
       };

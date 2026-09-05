@@ -1,4 +1,4 @@
--- Investment Portfolio — Supabase schema
+-- Vestalyze — Supabase schema
 -- Run this in the Supabase SQL editor (or supabase db push) before seed.sql.
 -- Enable Row Level Security on every table. Nested catalog rows are tenant-scoped
 -- with user_id = auth.uid(). FX lives on the owner profile.
@@ -26,11 +26,6 @@ exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  create type public.data_status as enum ('fresh', 'stale', 'failed', 'pending');
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
   create type public.scrape_status as enum ('success', 'failed', 'running');
 exception when duplicate_object then null;
 end $$;
@@ -47,37 +42,27 @@ create table if not exists public.profiles (
 create table if not exists public.securities (
   id text primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
-  company_name text not null,
   standardized_name text not null,
   ticker text not null,
-  isin text,
-  exchange text not null,
   country public.country_code not null,
   currency public.currency_code not null,
   sector text not null,
-  industry text not null,
   unique (user_id, ticker, country)
 );
 
 create index if not exists securities_ticker_idx on public.securities (ticker);
-create index if not exists securities_isin_idx on public.securities (isin);
 create index if not exists securities_user_idx on public.securities (user_id);
 
 create table if not exists public.funds (
   id text primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
-  symbol text not null,
   type public.fund_type not null,
-  fund_house text not null,
-  category text not null,
   country public.country_code not null,
   currency public.currency_code not null,
   latest_portfolio_date date not null,
-  source_website text not null,
   source_url text not null,
-  last_scraped_at timestamptz not null,
-  data_status public.data_status not null default 'pending'
+  last_scraped_at timestamptz not null
 );
 
 create unique index if not exists funds_user_source_url_idx
@@ -95,7 +80,6 @@ create table if not exists public.fund_holdings (
     allocation_percentage >= 0 and allocation_percentage <= 100
   ),
   holding_date date not null,
-  source_id text not null,
   unique (fund_id, security_id, holding_date)
 );
 
@@ -115,8 +99,7 @@ create table if not exists public.investments (
   units numeric,
   source_url text,
   last_synced_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+  created_at timestamptz not null default timezone('utc', now())
 );
 
 create index if not exists investments_user_idx on public.investments (user_id);

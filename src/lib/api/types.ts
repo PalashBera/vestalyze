@@ -1,7 +1,6 @@
 export type Country = "IN" | "US";
 export type Currency = "INR" | "USD";
 export type InvestmentType = "mutual_fund" | "etf" | "stock";
-export type DataStatus = "fresh" | "stale" | "failed" | "pending";
 export type ScrapeStatus = "success" | "failed" | "running";
 
 export interface User {
@@ -29,32 +28,23 @@ export interface Session {
 export interface Security {
   id: string;
   userId: string;
-  companyName: string;
   standardizedName: string;
   ticker: string;
-  isin?: string;
-  exchange: string;
   country: Country;
   currency: Currency;
   sector: string;
-  industry: string;
 }
 
 export interface Fund {
   id: string;
   userId: string;
   name: string;
-  symbol: string;
   type: Exclude<InvestmentType, "stock">;
-  fundHouse: string;
-  category: string;
   country: Country;
   currency: Currency;
   latestPortfolioDate: string;
-  sourceWebsite: string;
   sourceUrl: string;
   lastScrapedAt: string;
-  dataStatus: DataStatus;
 }
 
 export interface FundHolding {
@@ -64,7 +54,6 @@ export interface FundHolding {
   securityId: string;
   allocationPercentage: number;
   holdingDate: string;
-  sourceId: string;
 }
 
 export interface Investment {
@@ -81,7 +70,6 @@ export interface Investment {
   sourceUrl?: string;
   lastSyncedAt?: string;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface InvestmentSync {

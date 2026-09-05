@@ -46,7 +46,7 @@ export default function ExposureDetailPage({
     <div className="flex flex-col gap-6">
       <PageHeader
         title={data.security.standardizedName}
-        description={`${data.security.companyName} · ${data.security.exchange} · ${data.security.sector}`}
+        description={`${data.security.sector} · ${data.security.country === "IN" ? "India" : "United States"}`}
       />
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Total exposure" value={money(data.totalInvestedInr)} hint={`${formatPercent(data.portfolioPercentage)} of portfolio`} />

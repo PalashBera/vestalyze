@@ -22,7 +22,15 @@ const placeholderUs: MarketDashboard = {
   exposures: placeholderExposures.filter((item) => item.usInvestedInr > 0),
 };
 
-function UsBody({ data, preview = false }: { data: MarketDashboard; preview?: boolean }) {
+function UsBody({
+  data,
+  preview = false,
+  emptyExposure = false,
+}: {
+  data: MarketDashboard;
+  preview?: boolean;
+  emptyExposure?: boolean;
+}) {
   const { moneyNative } = useSettings();
   return (
     <div className="flex flex-col gap-6">
@@ -41,7 +49,18 @@ function UsBody({ data, preview = false }: { data: MarketDashboard; preview?: bo
           <CardDescription>Direct holdings plus ETF look-through allocations.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <ExposureTable rows={data.exposures} variant="us" disableLinks={preview} />
+          {emptyExposure ? (
+            <PlaceholderPreview
+              title="No stock exposure yet"
+              description="Add a US stock or sync a US ETF URL to fill look-through company exposure."
+              href="/onboarding?country=US"
+              actionLabel="Add a US holding"
+            >
+              <ExposureTable rows={placeholderUs.exposures} variant="us" disableLinks />
+            </PlaceholderPreview>
+          ) : (
+            <ExposureTable rows={data.exposures} variant="us" disableLinks={preview} />
+          )}
         </CardContent>
       </Card>
     </div>
@@ -70,6 +89,10 @@ export default function UsPage() {
         <UsBody data={placeholderUs} preview />
       </PlaceholderPreview>
     );
+  }
+
+  if (data.exposures.length === 0) {
+    return <UsBody data={data} emptyExposure />;
   }
 
   return <UsBody data={data} />;

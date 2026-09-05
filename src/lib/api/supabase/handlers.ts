@@ -150,24 +150,18 @@ async function ensureSupabaseFund(
     return mapFund(existing);
   }
   const now = new Date().toISOString();
-  const host = new URL(input.sourceUrl).hostname;
   const { data, error } = await supabase
     .from("funds")
     .insert({
       id: `fund-${crypto.randomUUID()}`,
       user_id: userId,
       name: input.name,
-      symbol: input.name.slice(0, 16).toUpperCase().replace(/\s+/g, ""),
       type: input.type,
-      fund_house: host,
-      category: "Uncategorized",
       country: input.country,
       currency: input.currency,
       latest_portfolio_date: now.slice(0, 10),
-      source_website: host,
       source_url: input.sourceUrl,
       last_scraped_at: now,
-      data_status: "pending",
     })
     .select("*")
     .single();
@@ -308,15 +302,11 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
       const { error: securityError } = await supabase.from("securities").insert({
         id: security.id,
         user_id: userId,
-        company_name: security.companyName,
         standardized_name: security.standardizedName,
         ticker: security.ticker,
-        isin: security.isin ?? null,
-        exchange: security.exchange,
         country: security.country,
         currency: security.currency,
         sector: security.sector,
-        industry: security.industry,
       });
       if (securityError) {
         throwQueryError("Unable to save the stock details.", 400);
@@ -371,8 +361,7 @@ export async function supabaseUpdateInvestment(
     units?: number | null;
     source_url?: string | null;
     fund_id?: string | null;
-    updated_at: string;
-  } = { updated_at: new Date().toISOString() };
+  } = {};
   if (input.name) {
     patch.name = input.name.trim();
   }
@@ -468,15 +457,11 @@ export async function supabaseSyncInvestment(userId: string, id: string) {
         const { error: securityError } = await supabase.from("securities").insert({
           id: security.id,
           user_id: userId,
-          company_name: security.companyName,
           standardized_name: security.standardizedName,
           ticker: security.ticker,
-          isin: null,
-          exchange: security.exchange,
           country: security.country,
           currency: security.currency,
           sector: security.sector,
-          industry: security.industry,
         });
         if (securityError) {
           throwQueryError("Unable to save a holding company.", 400);
@@ -489,7 +474,6 @@ export async function supabaseSyncInvestment(userId: string, id: string) {
         security_id: securityId,
         allocation_percentage: item.allocationPercentage,
         holding_date: scraped.holdingDate,
-        source_id: "indmoney-holdings",
       });
     }
 
@@ -506,7 +490,6 @@ export async function supabaseSyncInvestment(userId: string, id: string) {
       .update({
         last_scraped_at: completedAt,
         latest_portfolio_date: scraped.holdingDate,
-        data_status: "fresh",
         source_url: sourceUrl,
       })
       .eq("id", fund.id)
@@ -606,7 +589,7 @@ export async function supabaseRefreshFund(userId: string, id: string) {
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("funds")
-    .update({ last_scraped_at: now, data_status: "fresh" })
+    .update({ last_scraped_at: now })
     .eq("id", id)
     .eq("user_id", userId)
     .select("id")

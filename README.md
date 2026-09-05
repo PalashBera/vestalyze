@@ -1,6 +1,6 @@
-# Investment Portfolio
+# Vestalyze
 
-Personal look-through investing for Indian mutual funds, ETFs, and US stocks. Investment Portfolio shows **where your money actually sits** after you add your own holdings. Nothing is preloaded. Each account only sees its own book.
+Personal look-through investing for Indian mutual funds, ETFs, and US stocks. Vestalyze shows **where your money actually sits** after you add your own holdings. Nothing is preloaded. Each account only sees its own book.
 
 The UI talks only to Next.js `/api/v1`. The BFF can serve an in-memory API or **Supabase**.
 

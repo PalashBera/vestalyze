@@ -21,7 +21,15 @@ const placeholderIndia: MarketDashboard = {
   exposures: placeholderExposures.filter((item) => item.indiaInvestedInr > 0),
 };
 
-function IndiaBody({ data, preview = false }: { data: MarketDashboard; preview?: boolean }) {
+function IndiaBody({
+  data,
+  preview = false,
+  emptyExposure = false,
+}: {
+  data: MarketDashboard;
+  preview?: boolean;
+  emptyExposure?: boolean;
+}) {
   const { moneyNative } = useSettings();
   return (
     <div className="flex flex-col gap-6">
@@ -41,7 +49,18 @@ function IndiaBody({ data, preview = false }: { data: MarketDashboard; preview?:
           <CardDescription>Same company combined across funds, ETFs, and direct holdings.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <ExposureTable rows={data.exposures} variant="india" disableLinks={preview} />
+          {emptyExposure ? (
+            <PlaceholderPreview
+              title="No stock exposure yet"
+              description="Sync a fund URL to unfold Indian companies behind your mutual funds and ETFs."
+              href="/investments"
+              actionLabel="Open investments"
+            >
+              <ExposureTable rows={placeholderIndia.exposures} variant="india" disableLinks />
+            </PlaceholderPreview>
+          ) : (
+            <ExposureTable rows={data.exposures} variant="india" disableLinks={preview} />
+          )}
         </CardContent>
       </Card>
     </div>
@@ -70,6 +89,10 @@ export default function IndiaPage() {
         <IndiaBody data={placeholderIndia} preview />
       </PlaceholderPreview>
     );
+  }
+
+  if (data.exposures.length === 0) {
+    return <IndiaBody data={data} emptyExposure />;
   }
 
   return <IndiaBody data={data} />;

@@ -1,6 +1,6 @@
 # Supabase Backend
 
-This document is the contract for running the Investment Portfolio API on **Supabase Auth + Postgres**.
+This document is the contract for running the Vestalyze API on **Supabase Auth + Postgres**.
 
 The browser still calls Next.js `/api/v1/...`. Next.js is the BFF:
 

@@ -16,6 +16,7 @@ import {
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import { formatPercent } from "@/lib/format";
+import { placeholderOverlaps } from "@/lib/placeholder/portfolio";
 
 export default function OverlapPage() {
   const { data, error, loading } = useAsync(() => api.portfolio.overlap());
@@ -40,36 +41,39 @@ export default function OverlapPage() {
         description="Shared underlying stocks between the mutual funds and ETFs you hold."
       />
       {data.overlaps.length === 0 ? (
-        <PlaceholderPreview description="Add at least two funds or ETFs with shared holdings to see overlap.">
-          <Card>
-            <CardHeader>
-              <CardTitle>Flexi Cap × Nasdaq 100</CardTitle>
-              <CardDescription>Overlap score 12.4%</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Company</TableHead>
-                    <TableHead className="text-right">Fund A</TableHead>
-                    <TableHead className="text-right">Fund B</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>Microsoft</TableCell>
-                    <TableCell className="text-right">5.0%</TableCell>
-                    <TableCell className="text-right">8.1%</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Amazon</TableCell>
-                    <TableCell className="text-right">5.5%</TableCell>
-                    <TableCell className="text-right">5.2%</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <PlaceholderPreview description="Add at least two funds or ETFs with shared holdings to see overlap. Sample pairs below.">
+          <div className="flex flex-col gap-4">
+            {placeholderOverlaps.map((overlap) => (
+              <Card key={`${overlap.fundAId}-${overlap.fundBId}`}>
+                <CardHeader>
+                  <CardTitle>
+                    {overlap.fundAName} × {overlap.fundBName}
+                  </CardTitle>
+                  <CardDescription>Overlap score {formatPercent(overlap.overlapScore)}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Company</TableHead>
+                        <TableHead className="text-right">Fund A</TableHead>
+                        <TableHead className="text-right">Fund B</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {overlap.overlappingSecurities.map((item) => (
+                        <TableRow key={item.securityId}>
+                          <TableCell>{item.name}</TableCell>
+                          <TableCell className="text-right">{formatPercent(item.allocationA)}</TableCell>
+                          <TableCell className="text-right">{formatPercent(item.allocationB)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </PlaceholderPreview>
       ) : null}
       {data.overlaps.map((overlap) => (

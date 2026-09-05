@@ -15,7 +15,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarInset>
         <header className="flex h-14 items-center gap-2 border-b px-4">
           <SidebarTrigger />
-          <Separator orientation="vertical" className="h-4" />
           <p className="text-sm text-muted-foreground">{APP_TAGLINE}</p>
           <div className="ml-auto">
             <ThemeToggle />

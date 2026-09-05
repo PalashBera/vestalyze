@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export function PlaceholderPreview({
   children,
@@ -19,18 +25,27 @@ export function PlaceholderPreview({
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl">
-      <div className="pointer-events-none select-none rounded-xl blur-[2px]" aria-hidden>
+      <div
+        className="pointer-events-none select-none rounded-xl blur-[1.5px]"
+        aria-hidden
+      >
         {children}
       </div>
       <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/35 p-3 sm:p-4">
         <Card className="w-full max-w-75 shadow-lg">
           <CardHeader>
             <CardTitle className="text-balance">{title}</CardTitle>
-            <CardDescription className="text-pretty">{description}</CardDescription>
+            <CardDescription className="text-pretty">
+              {description}
+            </CardDescription>
           </CardHeader>
           {hideAction ? null : (
             <CardContent>
-              <Button className="w-full" nativeButton={false} render={<Link href={href} />}>
+              <Button
+                className="w-full"
+                nativeButton={false}
+                render={<Link href={href} />}
+              >
                 {actionLabel}
               </Button>
             </CardContent>
