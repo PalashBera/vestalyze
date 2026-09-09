@@ -32,6 +32,13 @@ export function countryLabel(country: "IN" | "US"): string {
   return country === "IN" ? "India" : "United States";
 }
 
+export function titleize(value: string): string {
+  return value
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export function formatTimestamp(value?: string): string {
   if (!value) {
     return "Never";

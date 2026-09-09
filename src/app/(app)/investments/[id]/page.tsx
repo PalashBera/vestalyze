@@ -34,7 +34,7 @@ import {
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import type { Currency, ScrapeStatus } from "@/lib/api/types";
-import { countryLabel, formatPercent, formatTimestamp, typeLabel } from "@/lib/format";
+import { countryLabel, formatPercent, formatTimestamp, titleize, typeLabel } from "@/lib/format";
 import { placeholderHoldings, placeholderSyncs } from "@/lib/placeholder/portfolio";
 
 function HoldingsTable({
@@ -98,7 +98,7 @@ function SyncHistoryTable({
           <TableRow key={item.id}>
             <TableCell>{formatTimestamp(item.startedAt)}</TableCell>
             <TableCell>
-              <Badge variant={item.status === "success" ? "secondary" : "outline"}>{item.status}</Badge>
+              <Badge variant={item.status === "success" ? "secondary" : "outline"}>{titleize(item.status)}</Badge>
             </TableCell>
             <TableCell className="text-right">{item.recordsProcessed}</TableCell>
             <TableCell className="max-w-xs truncate text-muted-foreground">{item.errorMessage ?? "—"}</TableCell>
