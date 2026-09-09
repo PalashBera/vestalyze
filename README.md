@@ -2,15 +2,15 @@
 
 Personal look-through investing for Indian mutual funds, ETFs, and US stocks. Vestalyze shows **where your money actually sits** after you add your own holdings. Nothing is preloaded. Each account only sees its own book.
 
-The UI talks only to Next.js `/api/v1`. The BFF can serve an in-memory API or **Supabase**.
+The UI talks only to Next.js `/api/v1`. The BFF stores auth and holdings in **Supabase**.
 
-See [docs/SUPABASE.md](docs/SUPABASE.md) for Auth, schema, RLS, and how to switch providers.
+See [docs/SUPABASE.md](docs/SUPABASE.md) for Auth, schema, and RLS. See [docs/VERCEL.md](docs/VERCEL.md) to deploy on Vercel and which environment variables to set.
 
 ## Stack
 
 - Next.js 16 (App Router) and React 19
 - Tailwind CSS 4 and shadcn/ui
-- Cookie session authentication (in-memory cookie or Supabase SSR cookies)
+- Supabase Auth + Postgres (HttpOnly SSR cookies)
 - Dark, light, and system themes
 
 ## Setup
@@ -18,6 +18,11 @@ See [docs/SUPABASE.md](docs/SUPABASE.md) for Auth, schema, RLS, and how to switc
 ```bash
 npm install
 cp .env.example .env.local
+```
+
+Fill `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the Supabase project (Project Settings → API). Apply [`supabase/schema.sql`](supabase/schema.sql) once. Then:
+
+```bash
 npm run dev
 ```
 
@@ -25,15 +30,14 @@ Open [http://localhost:3000](http://localhost:3000). Register, then complete onb
 
 ### Environment
 
-Copy `.env.example` to `.env.local` (gitignored).
+Copy `.env.example` to `.env.local` (gitignored). Both values are server-only.
 
-| Variable             | Notes                                                                               |
-| -------------------- | ----------------------------------------------------------------------------------- |
-| `API_PROVIDER`       | `mock` (default, in-memory) or `supabase`                                           |
-| `DEMO_USER_EMAIL`    | In-memory only. Seeds a local login when both demo values are set. Empty portfolio. |
-| `DEMO_USER_PASSWORD` | In-memory only. Local only. Never commit this.                                      |
-| `SUPABASE_URL`       | Required when `API_PROVIDER=supabase`. Server only.                                 |
-| `SUPABASE_ANON_KEY`  | Required when `API_PROVIDER=supabase`. Server only.                                 |
+| Variable            | Notes                                         |
+| ------------------- | --------------------------------------------- |
+| `SUPABASE_URL`      | Project Settings → API → Project URL.         |
+| `SUPABASE_ANON_KEY` | Project Settings → API → `anon` `public` key. |
+
+Never commit the `service_role` key. Never put these in `NEXT_PUBLIC_*`.
 
 ## What you can do
 
@@ -48,19 +52,19 @@ Copy `.env.example` to `.env.local` (gitignored).
 ## Project layout
 
 ```text
-src/app/api/v1/[...slug]     BFF routes (in-memory or Supabase)
-src/lib/api/mock             In-memory handlers (still tenant-scoped by user)
-src/lib/api/supabase         Supabase Auth + Postgres handlers
+src/app/api/v1/[...slug]     BFF routes (Supabase)
+src/lib/api/supabase         Auth + Postgres handlers
 src/lib/finance              Exposure and FX math
 supabase/schema.sql          Tables and owner-only RLS
 supabase/seed.sql            Notes only; FX defaults live on profiles
 docs/SUPABASE.md             Supabase setup
+docs/VERCEL.md               Vercel deploy
 ```
 
 ## Security notes
 
 - Session cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` in production.
-- In-memory passwords are hashed with scrypt. Supabase Auth hashes passwords on their side.
+- Supabase Auth hashes passwords.
 - Auth errors stay generic.
 - Nested catalog rows (`securities`, `funds`, `fund_holdings`) are scoped with `user_id`. FX lives on the owner profile.
 - Supabase secrets stay on the server. Do not add a service role key to this repo.

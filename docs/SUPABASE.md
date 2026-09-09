@@ -9,9 +9,7 @@ The browser still calls Next.js `/api/v1/...`. Next.js is the BFF:
 3. Supabase Auth identifies the user. Row Level Security scopes every query to that user.
 4. Look-through math stays in `src/lib/finance`. Supabase stores data; it does not reimplement exposure formulas.
 
-Set `API_PROVIDER=supabase` to use this path. The in-memory provider (`API_PROVIDER=mock`) remains the default for local UI work without a project. Both providers scope nested data by user.
-
-The `/api/v1` JSON shapes stay the same in both providers so the UI does not change.
+Local development and Vercel both use this path. Nested data is scoped by the signed-in user.
 
 ---
 
@@ -31,11 +29,10 @@ Do not use the service role key in this app. Every request uses the anon key plu
 
 Add these to `.env.local` (gitignored). Copy from `.env.example`.
 
-| Variable                | Where to find it                             | Client?     |
-| ----------------------- | -------------------------------------------- | ----------- |
-| `API_PROVIDER=supabase` | App config                                   | Server      |
-| `SUPABASE_URL`          | Project Settings → API → Project URL         | Server only |
-| `SUPABASE_ANON_KEY`     | Project Settings → API → `anon` `public` key | Server only |
+| Variable            | Where to find it                             | Client?     |
+| ------------------- | -------------------------------------------- | ----------- |
+| `SUPABASE_URL`      | Project Settings → API → Project URL         | Server only |
+| `SUPABASE_ANON_KEY` | Project Settings → API → `anon` `public` key | Server only |
 
 The URL is not a secret. The anon key is meant to be used with RLS. This app keeps both on the server because the browser never talks to Supabase directly.
 
@@ -44,7 +41,6 @@ Never commit `service_role`. Never put it in `NEXT_PUBLIC_*`.
 Example:
 
 ```bash
-API_PROVIDER=supabase
 SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 SUPABASE_ANON_KEY=
 ```
@@ -64,14 +60,14 @@ There is no sample portfolio. New users add holdings in onboarding. Company name
 
 ## 4. Tables
 
-| Table               | Purpose                                    | RLS                                 |
-| ------------------- | ------------------------------------------ | ----------------------------------- |
-| `profiles`          | Name, display currency, and USD/INR rate   | Own row only                        |
-| `securities`        | Per-user security master                   | Owner CRUD (`user_id = auth.uid()`) |
-| `funds`             | Per-user mutual funds and ETFs             | Owner CRUD                          |
-| `fund_holdings`     | Per-user allocation %                      | Owner CRUD                          |
-| `investments`       | User positions (invested amount + units)   | Owner CRUD                          |
-| `investment_syncs`  | Per-investment scrape history              | Owner CRUD                          |
+| Table              | Purpose                                  | RLS                                 |
+| ------------------ | ---------------------------------------- | ----------------------------------- |
+| `profiles`         | Name, display currency, and USD/INR rate | Own row only                        |
+| `securities`       | Per-user security master                 | Owner CRUD (`user_id = auth.uid()`) |
+| `funds`            | Per-user mutual funds and ETFs           | Owner CRUD                          |
+| `fund_holdings`    | Per-user allocation %                    | Owner CRUD                          |
+| `investments`      | User positions (invested amount + units) | Owner CRUD                          |
+| `investment_syncs` | Per-investment scrape history            | Owner CRUD                          |
 
 `profiles.id` references `auth.users(id)`. A trigger `handle_new_user` inserts a profile from `raw_user_meta_data.name` on signup, with default FX `87.25`.
 
@@ -100,7 +96,7 @@ If Confirm email is on and there is no session after signup, the API returns: `A
 
 ## 6. API mapping
 
-Same paths as the in-memory API. When `API_PROVIDER=supabase`, handlers in `src/lib/api/supabase/handlers.ts` run. Catalog routes still require a session and only return the caller’s rows.
+Handlers in `src/lib/api/supabase/handlers.ts` run for every `/api/v1` request. Catalog routes require a session and only return the caller’s rows.
 
 | HTTP             | Path                                          | Supabase work                                       |
 | ---------------- | --------------------------------------------- | --------------------------------------------------- |
@@ -134,20 +130,19 @@ INDmoney pages may sit behind Cloudflare. If the fetch returns a challenge page,
 
 ---
 
-## 8. How to switch
+## 8. Local setup
 
 1. Create the project and disable confirm-email for local testing (Authentication → Providers → Email).
 2. Run `schema.sql` then `seed.sql`.
 3. Put `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `.env.local`.
-4. Set `API_PROVIDER=supabase`.
-5. Restart `npm run dev`.
-6. Register a new account and complete onboarding. Pages stay on a blurred preview until you add holdings.
-
-To go back to the in-memory API: `API_PROVIDER=mock`.
+4. Restart `npm run dev`.
+5. Register a new account and complete onboarding. Pages stay on a blurred preview until you add holdings.
 
 ---
 
 ## 9. Production checklist
+
+Vercel steps and the exact env vars are in [VERCEL.md](./VERCEL.md).
 
 - Turn on email confirmation (or add a stronger factor).
 - Set Site URL and redirect URLs to the real HTTPS origin.
@@ -169,5 +164,5 @@ supabase/functions/extract-url   Optional Edge Function for later crawl jobs
 src/lib/supabase/server.ts       Cookie SSR client
 src/lib/supabase/database.types.ts
 src/lib/api/supabase/handlers.ts Data + auth
-src/lib/api/provider.ts          mock | supabase
+src/lib/api/provider.ts          SUPABASE_URL + SUPABASE_ANON_KEY
 ```

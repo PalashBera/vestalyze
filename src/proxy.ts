@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 const PUBLIC_PATHS = new Set(["/", "/login", "/register"]);
 
 function hasSessionCookie(request: NextRequest): boolean {
-  if (request.cookies.get(SESSION_COOKIE)?.value) {
-    return true;
-  }
   return request.cookies.getAll().some((cookie) => {
     return cookie.name.startsWith("sb-") && cookie.name.includes("auth-token");
   });
