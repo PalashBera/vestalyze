@@ -6,7 +6,6 @@ function demoSecurity(
   name: string,
   ticker: string,
   country: "IN" | "US",
-  sector: string,
 ): StockExposure["security"] {
   return {
     id,
@@ -15,13 +14,12 @@ function demoSecurity(
     ticker,
     country,
     currency: country === "IN" ? "INR" : "USD",
-    sector,
   };
 }
 
 export const placeholderExposures: StockExposure[] = [
   {
-    security: demoSecurity("demo-hdfc", "HDFC Bank", "HDFCBANK", "IN", "Banking"),
+    security: demoSecurity("demo-hdfc", "HDFC Bank", "HDFCBANK", "IN"),
     mutualFundInvestedInr: 180000,
     etfInvestedInr: 42000,
     directInvestedInr: 0,
@@ -32,7 +30,7 @@ export const placeholderExposures: StockExposure[] = [
     breakdown: [],
   },
   {
-    security: demoSecurity("demo-aapl", "Apple", "AAPL", "US", "Technology"),
+    security: demoSecurity("demo-aapl", "Apple", "AAPL", "US"),
     mutualFundInvestedInr: 95000,
     etfInvestedInr: 70000,
     directInvestedInr: 40000,
@@ -43,7 +41,7 @@ export const placeholderExposures: StockExposure[] = [
     breakdown: [],
   },
   {
-    security: demoSecurity("demo-rel", "Reliance Industries", "RELIANCE", "IN", "Energy"),
+    security: demoSecurity("demo-rel", "Reliance Industries", "RELIANCE", "IN"),
     mutualFundInvestedInr: 60000,
     etfInvestedInr: 38000,
     directInvestedInr: 70000,
@@ -54,7 +52,7 @@ export const placeholderExposures: StockExposure[] = [
     breakdown: [],
   },
   {
-    security: demoSecurity("demo-msft", "Microsoft", "MSFT", "US", "Technology"),
+    security: demoSecurity("demo-msft", "Microsoft", "MSFT", "US"),
     mutualFundInvestedInr: 52000,
     etfInvestedInr: 61000,
     directInvestedInr: 0,
@@ -65,7 +63,7 @@ export const placeholderExposures: StockExposure[] = [
     breakdown: [],
   },
   {
-    security: demoSecurity("demo-nvda", "NVIDIA", "NVDA", "US", "Technology"),
+    security: demoSecurity("demo-nvda", "NVIDIA", "NVDA", "US"),
     mutualFundInvestedInr: 28000,
     etfInvestedInr: 54000,
     directInvestedInr: 22000,
@@ -76,7 +74,7 @@ export const placeholderExposures: StockExposure[] = [
     breakdown: [],
   },
   {
-    security: demoSecurity("demo-infy", "Infosys", "INFY", "IN", "Technology"),
+    security: demoSecurity("demo-infy", "Infosys", "INFY", "IN"),
     mutualFundInvestedInr: 48000,
     etfInvestedInr: 21000,
     directInvestedInr: 0,
@@ -87,7 +85,7 @@ export const placeholderExposures: StockExposure[] = [
     breakdown: [],
   },
   {
-    security: demoSecurity("demo-amzn", "Amazon", "AMZN", "US", "Consumer"),
+    security: demoSecurity("demo-amzn", "Amazon", "AMZN", "US"),
     mutualFundInvestedInr: 18000,
     etfInvestedInr: 41000,
     directInvestedInr: 0,
@@ -98,7 +96,7 @@ export const placeholderExposures: StockExposure[] = [
     breakdown: [],
   },
   {
-    security: demoSecurity("demo-tcs", "TCS", "TCS", "IN", "Technology"),
+    security: demoSecurity("demo-tcs", "TCS", "TCS", "IN"),
     mutualFundInvestedInr: 31000,
     etfInvestedInr: 12000,
     directInvestedInr: 15000,
@@ -109,7 +107,7 @@ export const placeholderExposures: StockExposure[] = [
     breakdown: [],
   },
   {
-    security: demoSecurity("demo-googl", "Alphabet", "GOOGL", "US", "Technology"),
+    security: demoSecurity("demo-googl", "Alphabet", "GOOGL", "US"),
     mutualFundInvestedInr: 12000,
     etfInvestedInr: 36000,
     directInvestedInr: 0,
@@ -120,7 +118,7 @@ export const placeholderExposures: StockExposure[] = [
     breakdown: [],
   },
   {
-    security: demoSecurity("demo-meta", "Meta", "META", "US", "Technology"),
+    security: demoSecurity("demo-meta", "Meta", "META", "US"),
     mutualFundInvestedInr: 8000,
     etfInvestedInr: 27000,
     directInvestedInr: 9000,
@@ -168,13 +166,13 @@ export const placeholderSyncs = [
   { id: "ps-3", startedAt: "2026-06-01T08:40:00.000Z", status: "failed" as const, recordsProcessed: 0, errorMessage: "Could not read the holdings table." },
 ];
 
-export const placeholderInvestments: Array<Pick<Investment, "id" | "name" | "type" | "country" | "currency"> & { invested: string; units: string; lastSync: string }> = [
-  { id: "pi-1", name: "Bandhan Small Cap Fund Direct Growth", type: "mutual_fund", country: "IN", currency: "INR", invested: "₹12,40,000", units: "18,420", lastSync: "12 Aug 2026" },
-  { id: "pi-2", name: "Nippon India Nifty 50 ETF", type: "etf", country: "IN", currency: "INR", invested: "₹3,80,000", units: "1,245", lastSync: "12 Aug 2026" },
-  { id: "pi-3", name: "Parag Parikh Flexi Cap Direct", type: "mutual_fund", country: "IN", currency: "INR", invested: "₹6,10,000", units: "8,902", lastSync: "3 Jul 2026" },
-  { id: "pi-4", name: "Invesco QQQ", type: "etf", country: "US", currency: "USD", invested: "$8,400", units: "18.2", lastSync: "12 Aug 2026" },
-  { id: "pi-5", name: "Apple", type: "stock", country: "US", currency: "USD", invested: "$5,000", units: "22", lastSync: "—" },
-  { id: "pi-6", name: "HDFC Bank", type: "stock", country: "IN", currency: "INR", invested: "₹2,15,000", units: "140", lastSync: "—" },
+export const placeholderInvestments: Array<Pick<Investment, "id" | "name" | "type" | "country" | "currency"> & { invested: string; lastSync: string }> = [
+  { id: "pi-1", name: "Bandhan Small Cap Fund Direct Growth", type: "mutual_fund", country: "IN", currency: "INR", invested: "₹12,40,000", lastSync: "12 Aug 2026" },
+  { id: "pi-2", name: "Nippon India Nifty 50 ETF", type: "etf", country: "IN", currency: "INR", invested: "₹3,80,000", lastSync: "12 Aug 2026" },
+  { id: "pi-3", name: "Parag Parikh Flexi Cap Direct", type: "mutual_fund", country: "IN", currency: "INR", invested: "₹6,10,000", lastSync: "3 Jul 2026" },
+  { id: "pi-4", name: "Invesco QQQ", type: "etf", country: "US", currency: "USD", invested: "$8,400", lastSync: "12 Aug 2026" },
+  { id: "pi-5", name: "Apple", type: "stock", country: "US", currency: "USD", invested: "$5,000", lastSync: "—" },
+  { id: "pi-6", name: "HDFC Bank", type: "stock", country: "IN", currency: "INR", invested: "₹2,15,000", lastSync: "—" },
 ];
 
 export const placeholderOverlaps: FundOverlap[] = [

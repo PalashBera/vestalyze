@@ -36,6 +36,7 @@ import { api } from "@/lib/api/client";
 import type { Currency, ScrapeStatus } from "@/lib/api/types";
 import { countryLabel, formatPercent, formatTimestamp, titleize, typeLabel } from "@/lib/format";
 import { placeholderHoldings, placeholderSyncs } from "@/lib/placeholder/portfolio";
+import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
 
 function HoldingsTable({
   rows,
@@ -49,6 +50,23 @@ function HoldingsTable({
   moneyNative: (amount: number, native: Currency) => string;
 }) {
   return (
+    <>
+      <RecordList>
+        {rows.map((row) => (
+          <RecordListItem
+            key={row.id}
+            title={row.name}
+            fields={[
+              { label: "Allocation", value: formatPercent(row.allocationPercentage) },
+              {
+                label: "Effective invested",
+                value: moneyNative(investedAmount * (row.allocationPercentage / 100), currency),
+              },
+            ]}
+          />
+        ))}
+      </RecordList>
+      <DesktopTable>
     <Table>
       <TableHeader>
         <TableRow>
@@ -69,6 +87,8 @@ function HoldingsTable({
         ))}
       </TableBody>
     </Table>
+      </DesktopTable>
+    </>
   );
 }
 
@@ -84,6 +104,23 @@ function SyncHistoryTable({
   }>;
 }) {
   return (
+    <>
+      <RecordList>
+        {rows.map((item) => (
+          <RecordListItem
+            key={item.id}
+            title={formatTimestamp(item.startedAt)}
+            subtitle={
+              <Badge variant={item.status === "success" ? "secondary" : "outline"}>{titleize(item.status)}</Badge>
+            }
+            fields={[
+              { label: "Holdings", value: item.recordsProcessed },
+              { label: "Error", value: item.errorMessage ?? "—" },
+            ]}
+          />
+        ))}
+      </RecordList>
+      <DesktopTable>
     <Table>
       <TableHeader>
         <TableRow>
@@ -106,6 +143,8 @@ function SyncHistoryTable({
         ))}
       </TableBody>
     </Table>
+      </DesktopTable>
+    </>
   );
 }
 
@@ -170,17 +209,11 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
           </div>
         }
       />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
             <CardDescription>Invested</CardDescription>
             <CardTitle>{moneyNative(investment.investedAmount, investment.currency)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Units</CardDescription>
-            <CardTitle>{investment.units ?? "—"}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
@@ -209,7 +242,7 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
               {fund?.latestPortfolioDate ? ` · portfolio ${fund.latestPortfolioDate}` : ""}.
             </CardDescription>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent>
             {holdings.length > 0 ? (
               <HoldingsTable
                 rows={holdings.map((holding) => ({
@@ -244,7 +277,7 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
             <CardTitle>Sync history</CardTitle>
             <CardDescription>When each scrape started and how many stocks were stored.</CardDescription>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent>
             {syncs.length > 0 ? (
               <SyncHistoryTable rows={syncs} />
             ) : (

@@ -23,7 +23,7 @@ function ExposureBody({ rows, preview = false }: { rows: StockExposure[]; previe
           <CardTitle>All companies</CardTitle>
           <CardDescription>Click a column header to sort. Open a company for the contributing funds.</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           <ExposureTable rows={rows} disableLinks={preview} />
         </CardContent>
       </Card>

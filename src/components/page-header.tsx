@@ -13,7 +13,7 @@ export function PageHeader({
         <h1 className="font-heading text-2xl">{title}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>
       </div>
-      {actions}
+      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
     </div>
   );
 }

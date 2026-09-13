@@ -38,41 +38,25 @@ const countryItems = [
   { label: "United States", value: "US" },
 ];
 
-const sectorItems = [
-  { label: "Banking", value: "Banking" },
-  { label: "Technology", value: "Technology" },
-  { label: "Energy", value: "Energy" },
-  { label: "Consumer", value: "Consumer" },
-  { label: "Healthcare", value: "Healthcare" },
-  { label: "Financial Services", value: "Financial Services" },
-  { label: "Industrials", value: "Industrials" },
-  { label: "Uncategorized", value: "Uncategorized" },
-];
-
 export function InvestmentFields({
   type,
   country,
-  sector,
   defaults,
   lockType = false,
   onTypeChange,
   onCountryChange,
-  onSectorChange,
 }: {
   type: InvestmentType;
   country: Country;
-  sector: string;
   defaults?: {
     name?: string;
     investedAmount?: number;
-    units?: number;
     sourceUrl?: string;
     ticker?: string;
   };
   lockType?: boolean;
   onTypeChange: (type: InvestmentType) => void;
   onCountryChange: (country: Country) => void;
-  onSectorChange: (sector: string) => void;
 }) {
   const needsFundUrl = type === "mutual_fund" || type === "etf";
   return (
@@ -151,48 +135,23 @@ export function InvestmentFields({
         </Field>
       ) : null}
       {type === "stock" && !lockType ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="ticker">Stock code</FieldLabel>
-            <Input id="ticker" name="ticker" required maxLength={16} defaultValue={defaults?.ticker} placeholder="HDFCBANK" />
-          </Field>
-          <Field>
-            <FieldLabel>Category</FieldLabel>
-            <Select items={sectorItems} value={sector} onValueChange={(value) => onSectorChange(value ?? "Uncategorized")}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {sectorItems.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
+        <Field>
+          <FieldLabel htmlFor="ticker">Stock code</FieldLabel>
+          <Input id="ticker" name="ticker" required maxLength={16} defaultValue={defaults?.ticker} placeholder="HDFCBANK" />
+        </Field>
       ) : null}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="investedAmount">Invested</FieldLabel>
-          <Input
-            id="investedAmount"
-            name="investedAmount"
-            type="number"
-            min="1"
-            step="0.01"
-            required
-            defaultValue={defaults?.investedAmount}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="units">Units</FieldLabel>
-          <Input id="units" name="units" type="number" min="0" step="0.001" defaultValue={defaults?.units} />
-        </Field>
-      </div>
+      <Field>
+        <FieldLabel htmlFor="investedAmount">Invested amount</FieldLabel>
+        <Input
+          id="investedAmount"
+          name="investedAmount"
+          type="number"
+          min="1"
+          step="0.01"
+          required
+          defaultValue={defaults?.investedAmount}
+        />
+      </Field>
     </FieldGroup>
   );
 }
@@ -201,7 +160,6 @@ export function payloadFromForm(
   formData: FormData,
   type: InvestmentType,
   country: Country,
-  sector: string,
 ): CreateInvestmentRequest {
   return {
     name: String(formData.get("name") ?? "").trim(),
@@ -209,9 +167,7 @@ export function payloadFromForm(
     country,
     currency: (country === "IN" ? "INR" : "USD") as Currency,
     investedAmount: Number(formData.get("investedAmount")),
-    units: formData.get("units") ? Number(formData.get("units")) : undefined,
     ticker: String(formData.get("ticker") ?? ""),
-    sector,
     sourceUrl: String(formData.get("sourceUrl") ?? "").trim() || undefined,
   };
 }
@@ -263,12 +219,11 @@ export function InvestmentForm({
   const [pending, setPending] = useState(false);
   const [type, setType] = useState<InvestmentType>(investment?.type ?? "mutual_fund");
   const [country, setCountry] = useState<Country>(investment?.country ?? "IN");
-  const [sector, setSector] = useState("Uncategorized");
 
   async function onSubmit(formData: FormData) {
     setPending(true);
     try {
-      const payload = payloadFromForm(formData, type, country, sector);
+      const payload = payloadFromForm(formData, type, country);
       if (investment) {
         await api.investments.update(investment.id, payload);
         toast.success("Investment updated");
@@ -310,7 +265,7 @@ export function InvestmentForm({
           <DialogTitle>{editing ? "Edit investment" : "Add investment"}</DialogTitle>
           <DialogDescription>
             {editing
-              ? "Update invested amount, units, or the fund URL used for holdings sync."
+              ? "Update the invested amount or the fund URL used for holdings sync."
               : "Track a mutual fund, ETF, or direct stock you already hold."}
           </DialogDescription>
         </DialogHeader>
@@ -322,17 +277,14 @@ export function InvestmentForm({
           <InvestmentFields
             type={type}
             country={country}
-            sector={sector}
             lockType={editing}
             defaults={{
               name: investment?.name,
               investedAmount: investment?.investedAmount,
-              units: investment?.units,
               sourceUrl: investment?.sourceUrl,
             }}
             onTypeChange={setType}
             onCountryChange={setCountry}
-            onSectorChange={setSector}
           />
           <DialogFooter>
             <Button type="submit" disabled={pending}>

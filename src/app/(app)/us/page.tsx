@@ -48,7 +48,7 @@ function UsBody({
           <CardTitle>Consolidated US stock exposure</CardTitle>
           <CardDescription>Direct holdings plus ETF look-through allocations.</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           {emptyExposure ? (
             <PlaceholderPreview
               title="No stock exposure yet"

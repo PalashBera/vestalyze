@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ChangePasswordDialog, DeleteAccountDialog, EditProfileDialog } from "@/components/account-dialogs";
 import { PageHeader } from "@/components/page-header";
 import { useSettings } from "@/components/settings-provider";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,7 @@ export default function SettingsPage() {
               <Field>
                 <FieldLabel>Display currency</FieldLabel>
                 <Select items={currencyItems} value={currency} onValueChange={onCurrencyChange}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-full sm:w-40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -91,7 +92,7 @@ export default function SettingsPage() {
               </Field>
               <Field>
                 <FieldLabel htmlFor="fxRate">USD / INR rate</FieldLabel>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Input
                     id="fxRate"
                     type="number"
@@ -101,7 +102,7 @@ export default function SettingsPage() {
                     step="0.01"
                     value={fxInput}
                     onChange={(event) => setFxInput(event.target.value)}
-                    className="w-40"
+                    className="w-full sm:w-40"
                   />
                   <Button type="button" onClick={() => void onSaveFx()} disabled={savingFx}>
                     {savingFx ? <Spinner data-icon="inline-start" /> : null}
@@ -120,9 +121,23 @@ export default function SettingsPage() {
             <CardTitle>Account</CardTitle>
             <CardDescription>Your private account. Holdings on this login are visible only to you.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-1 text-sm">
-            <p>{user?.name}</p>
-            <p className="text-muted-foreground">{user?.email}</p>
+          <CardContent className="flex flex-col gap-4 text-sm">
+            <div className="flex flex-col gap-1">
+              <p>{user?.name}</p>
+              <p className="text-muted-foreground">{user?.email}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <EditProfileDialog />
+              <ChangePasswordDialog />
+            </div>
+            <div className="flex flex-col gap-3 border-t pt-4">
+              <p className="text-muted-foreground">
+                Delete this account and every holding stored with it. This cannot be undone.
+              </p>
+              <div>
+                <DeleteAccountDialog />
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

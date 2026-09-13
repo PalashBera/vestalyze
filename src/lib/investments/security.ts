@@ -23,7 +23,6 @@ export function buildSecurityFromCompany(userId: string, name: string, country: 
     ticker: slug.toUpperCase(),
     country,
     currency: (country === "IN" ? "INR" : "USD") as Currency,
-    sector: "Uncategorized",
   };
 }
 
@@ -42,6 +41,5 @@ export function buildSecurityFromInput(input: CreateInvestmentRequest, userId: s
     ticker,
     country: input.country,
     currency: (input.country === "IN" ? "INR" : "USD") as Currency,
-    sector: input.sector?.trim() || "Uncategorized",
   };
 }

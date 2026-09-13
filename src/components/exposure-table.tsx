@@ -14,17 +14,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
 import { formatPercent } from "@/lib/format";
 
 type Variant = "consolidated" | "india" | "us";
-type SortKey = "company" | "sector" | "india" | "us" | "total" | "weight" | "mf" | "etf" | "direct";
+type SortKey = "company" | "india" | "us" | "total" | "weight" | "mf" | "etf" | "direct";
 
 function valueFor(row: StockExposure, key: SortKey): string | number {
   switch (key) {
     case "company":
       return row.security.standardizedName.toLowerCase();
-    case "sector":
-      return row.security.sector.toLowerCase();
     case "india":
       return row.indiaInvestedInr;
     case "us":
@@ -95,7 +94,7 @@ export function ExposureTable({
       return;
     }
     setSortKey(column);
-    setDirection(column === "company" || column === "sector" ? "asc" : "desc");
+    setDirection(column === "company" ? "asc" : "desc");
   }
 
   const sorted = useMemo(() => {
@@ -107,14 +106,51 @@ export function ExposureTable({
     });
   }, [rows, sortKey, direction]);
 
+  const fieldsFor = (row: StockExposure) => {
+    if (variant === "consolidated") {
+      return [
+        { label: "India", value: money(row.indiaInvestedInr) },
+        { label: "US", value: money(row.usInvestedInr) },
+        { label: "Total", value: money(row.totalInvestedInr) },
+        { label: "Weight", value: formatPercent(row.portfolioPercentage) },
+      ];
+    }
+    if (variant === "india") {
+      return [
+        { label: "Mutual Funds", value: money(row.mutualFundInvestedInr) },
+        { label: "ETFs", value: money(row.etfInvestedInr) },
+        { label: "Direct", value: money(row.directInvestedInr) },
+        { label: "Total", value: money(row.totalInvestedInr) },
+        { label: "Weight", value: formatPercent(row.portfolioPercentage) },
+      ];
+    }
+    return [
+      { label: "Direct", value: money(row.directInvestedInr) },
+      { label: "ETF", value: money(row.etfInvestedInr) },
+      { label: "Total", value: money(row.totalInvestedInr) },
+      { label: "Weight", value: formatPercent(row.portfolioPercentage) },
+    ];
+  };
+
   return (
+    <>
+      <RecordList>
+        {sorted.map((row) => (
+          <RecordListItem
+            key={row.security.id}
+            title={row.security.standardizedName}
+            href={disableLinks ? undefined : `/exposure/${row.security.id}`}
+            fields={fieldsFor(row)}
+          />
+        ))}
+      </RecordList>
+      <DesktopTable>
     <Table>
       <TableHeader>
         <TableRow>
           {variant === "consolidated" ? (
             <>
               <SortableHead label="Company" column="company" active={sortKey} direction={direction} onSort={onSort} />
-              <SortableHead label="Category" column="sector" active={sortKey} direction={direction} onSort={onSort} />
               <SortableHead label="India" column="india" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="US" column="us" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="Total" column="total" active={sortKey} direction={direction} align="right" onSort={onSort} />
@@ -159,7 +195,6 @@ export function ExposureTable({
             </TableCell>
             {variant === "consolidated" ? (
               <>
-                <TableCell>{row.security.sector}</TableCell>
                 <TableCell className="text-right">{money(row.indiaInvestedInr)}</TableCell>
                 <TableCell className="text-right">{money(row.usInvestedInr)}</TableCell>
               </>
@@ -181,5 +216,7 @@ export function ExposureTable({
         ))}
       </TableBody>
     </Table>
+      </DesktopTable>
+    </>
   );
 }

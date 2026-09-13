@@ -306,7 +306,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
         ticker: security.ticker,
         country: security.country,
         currency: security.currency,
-        sector: security.sector,
       });
       if (securityError) {
         throwQueryError("Unable to save the stock details.", 400);
@@ -334,7 +333,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
       country: input.country,
       currency: input.currency,
       invested_amount: input.investedAmount,
-      units: input.units ?? null,
       source_url: sourceUrl || null,
     })
     .select("*")
@@ -358,7 +356,6 @@ export async function supabaseUpdateInvestment(
   const patch: {
     name?: string;
     invested_amount?: number;
-    units?: number | null;
     source_url?: string | null;
     fund_id?: string | null;
   } = {};
@@ -367,9 +364,6 @@ export async function supabaseUpdateInvestment(
   }
   if (input.investedAmount !== undefined) {
     patch.invested_amount = input.investedAmount;
-  }
-  if (input.units !== undefined) {
-    patch.units = input.units;
   }
   if (input.sourceUrl !== undefined) {
     const sourceUrl = normalizeSourceUrl(input.sourceUrl);
@@ -461,7 +455,6 @@ export async function supabaseSyncInvestment(userId: string, id: string) {
           ticker: security.ticker,
           country: security.country,
           currency: security.currency,
-          sector: security.sector,
         });
         if (securityError) {
           throwQueryError("Unable to save a holding company.", 400);
@@ -670,6 +663,107 @@ export async function supabaseOverlap(userId: string) {
       };
     }),
   }));
+}
+
+export async function supabaseUpdateProfile(userId: string, input: { name?: string; email?: string }) {
+  const nextName = input.name?.trim();
+  const nextEmail = input.email?.trim().toLowerCase();
+  if (nextName === undefined && nextEmail === undefined) {
+    throwQueryError("Nothing to update.", 400);
+  }
+  if (nextName !== undefined && (!nextName || nextName.length > 80)) {
+    throwQueryError("Name is required.", 400);
+  }
+  if (nextEmail !== undefined && !isValidEmail(nextEmail)) {
+    throwQueryError("Enter a valid email address.", 400);
+  }
+
+  const supabase = await client();
+  if (nextName) {
+    const { error } = await supabase.from("profiles").update({ name: nextName }).eq("id", userId);
+    if (error) {
+      throwQueryError("Unable to update name.", 400);
+    }
+    const { error: metaError } = await supabase.auth.updateUser({ data: { name: nextName } });
+    if (metaError) {
+      throwQueryError("Unable to update name.", 400);
+    }
+  }
+
+  let emailConfirmationRequired = false;
+  if (nextEmail) {
+    const { data, error } = await supabase.auth.updateUser({ email: nextEmail });
+    if (error || !data.user) {
+      throwQueryError("Unable to update email.", 400);
+    }
+    emailConfirmationRequired = (data.user.email ?? "").toLowerCase() !== nextEmail;
+  }
+
+  return { user: await supabaseMe(userId), emailConfirmationRequired };
+}
+
+export async function supabaseUpdatePassword(
+  userId: string,
+  input: { currentPassword: string; newPassword: string },
+) {
+  if (!isValidPassword(input.currentPassword) || !isValidPassword(input.newPassword)) {
+    throwQueryError("Password must be between 8 and 128 characters.", 400);
+  }
+  if (input.currentPassword === input.newPassword) {
+    throwQueryError("Choose a different new password.", 400);
+  }
+
+  const supabase = await client();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user?.email || auth.user.id !== userId) {
+    throwQueryError("Unauthorized", 401);
+  }
+
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: auth.user.email,
+    password: input.currentPassword,
+  });
+  if (verifyError) {
+    throwQueryError("Current password is incorrect.", 400);
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: input.newPassword });
+  if (error) {
+    throwQueryError("Unable to update password.", 400);
+  }
+  return { ok: true as const };
+}
+
+export async function supabaseDeleteAccount(userId: string, password: string) {
+  if (!isValidPassword(password)) {
+    throwQueryError("Password must be between 8 and 128 characters.", 400);
+  }
+
+  const supabase = await client();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user?.email || auth.user.id !== userId) {
+    throwQueryError("Unauthorized", 401);
+  }
+
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: auth.user.email,
+    password,
+  });
+  if (verifyError) {
+    throwQueryError("Current password is incorrect.", 400);
+  }
+
+  const { error } = await supabase.rpc("delete_own_account");
+  if (error) {
+    throwQueryError("Unable to delete account.", 400);
+  }
+
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // Session is already invalid after the auth user is removed.
+  }
+  return { ok: true as const };
 }
 
 export async function supabaseGetSettings(userId: string) {

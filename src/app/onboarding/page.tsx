@@ -46,7 +46,6 @@ function OnboardingForm() {
   const [added, setAdded] = useState(0);
   const [type, setType] = useState<InvestmentType>("mutual_fund");
   const [country, setCountry] = useState<Country>(searchParams.get("country") === "US" ? "US" : "IN");
-  const [sector, setSector] = useState("Uncategorized");
 
   async function onCurrencyChange(value: string | null) {
     if (value !== "INR" && value !== "USD") {
@@ -58,7 +57,7 @@ function OnboardingForm() {
   async function onAdd(formData: FormData) {
     setPending(true);
     try {
-      await api.investments.create(payloadFromForm(formData, type, country, sector));
+      await api.investments.create(payloadFromForm(formData, type, country));
       setAdded((count) => count + 1);
       toast.success("Holding saved");
     } catch (error) {
@@ -121,10 +120,8 @@ function OnboardingForm() {
                 <InvestmentFields
                   type={type}
                   country={country}
-                  sector={sector}
                   onTypeChange={setType}
                   onCountryChange={setCountry}
-                  onSectorChange={setSector}
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Button type="button" variant="ghost" nativeButton={false} render={<Link href="/dashboard" />}>

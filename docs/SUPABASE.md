@@ -51,23 +51,31 @@ SUPABASE_ANON_KEY=
 
 In the Supabase SQL editor, run in order:
 
-1. [`supabase/schema.sql`](../supabase/schema.sql) — tables, trigger, owner-only RLS
+1. [`supabase/schema.sql`](../supabase/schema.sql) — drops existing app tables, then creates tables, trigger, and owner-only RLS
 2. [`supabase/seed.sql`](../supabase/seed.sql) — notes only; FX defaults live on `profiles`
 
+`schema.sql` wipes `profiles`, `securities`, `funds`, `fund_holdings`, `investments`, and `investment_syncs`. It does not drop `auth.users`. After a reset, existing accounts need a new profile row (sign up again, or insert into `profiles`).
+
 There is no sample portfolio. New users add holdings in onboarding. Company names from fund syncs and direct stocks they enter are stored in `securities` under their `user_id`.
+
+You do **not** need a new Supabase project unless you want one. To reset the current project, paste `schema.sql` in the SQL editor. To keep existing holdings and only drop unused columns, those were already removed: `securities.sector` and `investments.units`.
 
 ---
 
 ## 4. Tables
 
-| Table              | Purpose                                  | RLS                                 |
-| ------------------ | ---------------------------------------- | ----------------------------------- |
-| `profiles`         | Name, display currency, and USD/INR rate | Own row only                        |
-| `securities`       | Per-user security master                 | Owner CRUD (`user_id = auth.uid()`) |
-| `funds`            | Per-user mutual funds and ETFs           | Owner CRUD                          |
-| `fund_holdings`    | Per-user allocation %                    | Owner CRUD                          |
-| `investments`      | User positions (invested amount + units) | Owner CRUD                          |
-| `investment_syncs` | Per-investment scrape history            | Owner CRUD                          |
+Field-by-field purpose and an ER diagram: [ER.md](./ER.md).
+
+| Table              | Columns that stay                                                                                                                                 | RLS                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `profiles`         | `id`, `name`, `display_currency`, `fx_usd_inr`, `fx_as_of`, `created_at`                                                                          | Own row only                        |
+| `securities`       | `id`, `user_id`, `standardized_name`, `ticker`, `country`, `currency`                                                                             | Owner CRUD (`user_id = auth.uid()`) |
+| `funds`            | `id`, `user_id`, `name`, `type`, `country`, `currency`, `latest_portfolio_date`, `source_url`, `last_scraped_at`                                  | Owner CRUD                          |
+| `fund_holdings`    | `id`, `user_id`, `fund_id`, `security_id`, `allocation_percentage`, `holding_date`                                                                | Owner CRUD                          |
+| `investments`      | `id`, `user_id`, `fund_id`, `security_id`, `name`, `type`, `country`, `currency`, `invested_amount`, `source_url`, `last_synced_at`, `created_at` | Owner CRUD                          |
+| `investment_syncs` | `id`, `user_id`, `investment_id`, `started_at`, `status`, `records_processed`, `error_message`                                                    | Owner CRUD                          |
+
+Removed: `securities.sector` (stock category) and `investments.units`. Every other column is still read or written by the API.
 
 `profiles.id` references `auth.users(id)`. A trigger `handle_new_user` inserts a profile from `raw_user_meta_data.name` on signup, with default FX `87.25`.
 
@@ -77,12 +85,13 @@ Securities are unique on `(user_id, ticker, country)`. Two accounts can own the 
 
 ## 5. Authentication
 
-| App endpoint                 | Supabase call                   |
-| ---------------------------- | ------------------------------- |
-| `POST /api/v1/auth/register` | `auth.signUp` + profile trigger |
-| `POST /api/v1/auth/login`    | `auth.signInWithPassword`       |
-| `POST /api/v1/auth/logout`   | `auth.signOut`                  |
-| `GET /api/v1/auth/me`        | `auth.getUser` + `profiles`     |
+| App endpoint                  | Supabase call                   |
+| ----------------------------- | ------------------------------- |
+| `POST /api/v1/auth/register`  | `auth.signUp` + profile trigger |
+| `POST /api/v1/auth/login`     | `auth.signInWithPassword`       |
+| `POST /api/v1/auth/logout`    | `auth.signOut`                  |
+| `GET /api/v1/auth/me`         | `auth.getUser` + `profiles`     |
+| `DELETE /api/v1/auth/account` | `delete_own_account()` RPC      |
 
 Sessions are stored in **HttpOnly**, `SameSite=Lax` cookies by `@supabase/ssr`. `Secure` is set in production. The proxy treats `sb-*-auth-token*` cookies as a signed-in session.
 
@@ -91,6 +100,8 @@ Login errors stay generic: `Invalid username or password`.
 Password rules in the app: 8–128 characters. Paste is allowed.
 
 If Confirm email is on and there is no session after signup, the API returns: `Account created. Confirm the email before signing in.`
+
+Account deletion requires the current password. The BFF then calls `delete_own_account()`, a security-definer function that removes the caller’s `investment_syncs`, `fund_holdings`, `investments`, `funds`, `securities`, `profiles`, and `auth.users` row. Other accounts are untouched.
 
 ---
 
@@ -109,6 +120,7 @@ Handlers in `src/lib/api/supabase/handlers.ts` run for every `/api/v1` request. 
 | GET              | `/portfolio/*`                                | Load investments + holdings, then `src/lib/finance` |
 | GET/PATCH        | `/settings`                                   | `profiles.display_currency`                         |
 | GET/PATCH        | `/fx/rate`                                    | `profiles.fx_usd_inr` / `fx_as_of`                  |
+| DELETE           | `/auth/account`                               | Password check, then `delete_own_account()`         |
 
 Look-through formula (unchanged):
 
@@ -158,7 +170,8 @@ Vercel steps and the exact env vars are in [VERCEL.md](./VERCEL.md).
 
 ```text
 docs/SUPABASE.md                 This guide
-supabase/schema.sql              Tables, RLS, trigger
+docs/ER.md                       Tables, fields, ER diagram
+supabase/schema.sql              Tables, RLS, trigger, delete_own_account()
 supabase/seed.sql                Notes (no sample portfolio)
 supabase/functions/extract-url   Optional Edge Function for later crawl jobs
 src/lib/supabase/server.ts       Cookie SSR client

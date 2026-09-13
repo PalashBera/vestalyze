@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -20,13 +20,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  async function onSubmit(formData: FormData) {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setPending(true);
     setError(null);
-    const email = String(formData.get("email") ?? "");
-    const password = String(formData.get("password") ?? "");
-    const name = String(formData.get("name") ?? "");
 
     try {
       if (mode === "login") {
@@ -56,10 +57,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <ThemeToggle />
       </header>
       <main className="flex flex-1 items-center justify-center px-4 pb-16">
-        <form
-          className="flex w-full max-w-sm flex-col gap-6"
-          action={(formData) => void onSubmit(formData)}
-        >
+        <form className="flex w-full max-w-sm flex-col gap-6" onSubmit={(event) => void onSubmit(event)}>
           <div className="flex flex-col gap-2">
             <h1 className="font-heading text-2xl">
               {mode === "login" ? "Sign in" : "Create account"}
@@ -74,7 +72,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
             {mode === "register" ? (
               <Field>
                 <FieldLabel htmlFor="name">Name</FieldLabel>
-                <Input id="name" name="name" autoComplete="name" required maxLength={80} />
+                <Input
+                  id="name"
+                  name="name"
+                  autoComplete="name"
+                  required
+                  maxLength={80}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
               </Field>
             ) : null}
             <Field data-invalid={Boolean(error) || undefined}>
@@ -86,6 +92,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 autoComplete="email"
                 required
                 aria-invalid={Boolean(error)}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
               />
             </Field>
             <Field data-invalid={Boolean(error) || undefined}>
@@ -99,6 +107,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 minLength={8}
                 maxLength={128}
                 aria-invalid={Boolean(error)}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
               />
               <FieldDescription>
                 {error ?? "Use at least 8 characters. Paste is supported."}

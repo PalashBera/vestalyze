@@ -11,20 +11,6 @@ export interface User {
   createdAt: string;
 }
 
-export interface AuthUser extends User {
-  passwordHash: string;
-  fxUsdInr: number;
-  fxAsOf: string;
-}
-
-export interface Session {
-  id: string;
-  userId: string;
-  createdAt: number;
-  lastSeenAt: number;
-  userAgentHash: string;
-}
-
 export interface Security {
   id: string;
   userId: string;
@@ -32,7 +18,6 @@ export interface Security {
   ticker: string;
   country: Country;
   currency: Currency;
-  sector: string;
 }
 
 export interface Fund {
@@ -66,7 +51,6 @@ export interface Investment {
   country: Country;
   currency: Currency;
   investedAmount: number;
-  units?: number;
   sourceUrl?: string;
   lastSyncedAt?: string;
   createdAt: string;
@@ -181,18 +165,15 @@ export interface CreateInvestmentRequest {
   country: Country;
   currency: Currency;
   investedAmount: number;
-  units?: number;
   fundId?: string;
   securityId?: string;
   ticker?: string;
-  sector?: string;
   sourceUrl?: string;
 }
 
 export interface UpdateInvestmentRequest {
   name?: string;
   investedAmount?: number;
-  units?: number;
   sourceUrl?: string;
 }
 

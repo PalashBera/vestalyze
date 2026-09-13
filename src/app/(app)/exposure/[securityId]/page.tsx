@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/page-loader";
+import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
 import {
   Table,
   TableBody,
@@ -46,7 +47,7 @@ export default function ExposureDetailPage({
     <div className="flex flex-col gap-6">
       <PageHeader
         title={data.security.standardizedName}
-        description={`${data.security.sector} · ${data.security.country === "IN" ? "India" : "United States"}`}
+        description={data.security.country === "IN" ? "India" : "United States"}
       />
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Total exposure" value={money(data.totalInvestedInr)} hint={`${formatPercent(data.portfolioPercentage)} of portfolio`} />
@@ -58,7 +59,27 @@ export default function ExposureDetailPage({
           <CardTitle>Source breakdown</CardTitle>
           <CardDescription>How this company exposure is built from each investment.</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
+          <RecordList>
+            {data.breakdown.map((item) => (
+              <RecordListItem
+                key={`${item.investmentId}-${item.sourceName}`}
+                title={item.sourceName}
+                subtitle={<Badge variant="secondary">{typeLabel(item.sourceType)}</Badge>}
+                fields={[
+                  {
+                    label: "Allocation",
+                    value: item.allocationPercentage ? formatPercent(item.allocationPercentage) : "100%",
+                  },
+                  {
+                    label: "Effective invested",
+                    value: moneyNative(item.investedExposureNative, item.currency),
+                  },
+                ]}
+              />
+            ))}
+          </RecordList>
+          <DesktopTable>
           <Table>
             <TableHeader>
               <TableRow>
@@ -85,6 +106,7 @@ export default function ExposureDetailPage({
               ))}
             </TableBody>
           </Table>
+          </DesktopTable>
         </CardContent>
       </Card>
     </div>

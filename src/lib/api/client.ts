@@ -48,6 +48,21 @@ export const api = {
       }),
     logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
     me: () => request<{ user: User }>("/auth/me"),
+    updateProfile: (input: { name?: string; email?: string }) =>
+      request<{ user: User; emailConfirmationRequired: boolean }>("/auth/profile", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    updatePassword: (currentPassword: string, newPassword: string) =>
+      request<{ ok: boolean }>("/auth/password", {
+        method: "PATCH",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      }),
+    deleteAccount: (password: string) =>
+      request<{ ok: boolean }>("/auth/account", {
+        method: "DELETE",
+        body: JSON.stringify({ password }),
+      }),
   },
   investments: {
     list: () => request<{ investments: Investment[] }>("/investments"),
@@ -113,6 +128,13 @@ export const api = {
       request<FxRate>("/fx/rate", {
         method: "PATCH",
         body: JSON.stringify({ rate }),
+      }),
+  },
+  contact: {
+    send: (input: { name: string; email: string; message: string }) =>
+      request<{ ok: boolean; acknowledged: boolean }>("/contact", {
+        method: "POST",
+        body: JSON.stringify(input),
       }),
   },
 };

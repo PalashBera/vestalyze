@@ -36,7 +36,6 @@ export type Database = {
           ticker: string;
           country: "IN" | "US";
           currency: "INR" | "USD";
-          sector: string;
         };
         Insert: Database["public"]["Tables"]["securities"]["Row"];
         Update: Partial<Database["public"]["Tables"]["securities"]["Row"]>;
@@ -82,7 +81,6 @@ export type Database = {
           country: "IN" | "US";
           currency: "INR" | "USD";
           invested_amount: number;
-          units: number | null;
           source_url: string | null;
           last_synced_at: string | null;
           created_at: string;
@@ -97,7 +95,6 @@ export type Database = {
           country: "IN" | "US";
           currency: "INR" | "USD";
           invested_amount: number;
-          units?: number | null;
           source_url?: string | null;
           last_synced_at?: string | null;
           created_at?: string;
@@ -105,7 +102,6 @@ export type Database = {
         Update: {
           name?: string;
           invested_amount?: number;
-          units?: number | null;
           source_url?: string | null;
           last_synced_at?: string | null;
           fund_id?: string | null;
@@ -136,7 +132,12 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      delete_own_account: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

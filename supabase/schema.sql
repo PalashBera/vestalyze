@@ -1,36 +1,29 @@
--- Vestalyze — Supabase schema
--- Run this in the Supabase SQL editor (or supabase db push) before seed.sql.
--- Enable Row Level Security on every table. Nested catalog rows are tenant-scoped
--- with user_id = auth.uid(). FX lives on the owner profile.
+-- Vestalyze public schema.
+-- Safe on a new project, or on an existing one: drops app tables then recreates them.
+-- Does not drop auth.users.
+
+drop table if exists public.investment_syncs cascade;
+drop table if exists public.fund_holdings cascade;
+drop table if exists public.investments cascade;
+drop table if exists public.funds cascade;
+drop table if exists public.securities cascade;
+drop table if exists public.profiles cascade;
+drop function if exists public.handle_new_user() cascade;
+drop type if exists public.scrape_status;
+drop type if exists public.fund_type;
+drop type if exists public.investment_type;
+drop type if exists public.currency_code;
+drop type if exists public.country_code;
 
 create extension if not exists pgcrypto;
 
-do $$ begin
-  create type public.country_code as enum ('IN', 'US');
-exception when duplicate_object then null;
-end $$;
+create type public.country_code as enum ('IN', 'US');
+create type public.currency_code as enum ('INR', 'USD');
+create type public.investment_type as enum ('mutual_fund', 'etf', 'stock');
+create type public.fund_type as enum ('mutual_fund', 'etf');
+create type public.scrape_status as enum ('success', 'failed', 'running');
 
-do $$ begin
-  create type public.currency_code as enum ('INR', 'USD');
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.investment_type as enum ('mutual_fund', 'etf', 'stock');
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.fund_type as enum ('mutual_fund', 'etf');
-exception when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.scrape_status as enum ('success', 'failed', 'running');
-exception when duplicate_object then null;
-end $$;
-
-create table if not exists public.profiles (
+create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   name text not null check (char_length(name) between 1 and 80),
   display_currency public.currency_code not null default 'INR',
@@ -39,21 +32,20 @@ create table if not exists public.profiles (
   created_at timestamptz not null default timezone('utc', now())
 );
 
-create table if not exists public.securities (
+create table public.securities (
   id text primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
   standardized_name text not null,
   ticker text not null,
   country public.country_code not null,
   currency public.currency_code not null,
-  sector text not null,
   unique (user_id, ticker, country)
 );
 
-create index if not exists securities_ticker_idx on public.securities (ticker);
-create index if not exists securities_user_idx on public.securities (user_id);
+create index securities_ticker_idx on public.securities (ticker);
+create index securities_user_idx on public.securities (user_id);
 
-create table if not exists public.funds (
+create table public.funds (
   id text primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
@@ -65,13 +57,13 @@ create table if not exists public.funds (
   last_scraped_at timestamptz not null
 );
 
-create unique index if not exists funds_user_source_url_idx
+create unique index funds_user_source_url_idx
   on public.funds (user_id, source_url)
   where length(trim(source_url)) > 0;
 
-create index if not exists funds_user_idx on public.funds (user_id);
+create index funds_user_idx on public.funds (user_id);
 
-create table if not exists public.fund_holdings (
+create table public.fund_holdings (
   id text primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
   fund_id text not null references public.funds (id) on delete cascade,
@@ -83,10 +75,10 @@ create table if not exists public.fund_holdings (
   unique (fund_id, security_id, holding_date)
 );
 
-create index if not exists fund_holdings_fund_idx on public.fund_holdings (fund_id);
-create index if not exists fund_holdings_user_idx on public.fund_holdings (user_id);
+create index fund_holdings_fund_idx on public.fund_holdings (fund_id);
+create index fund_holdings_user_idx on public.fund_holdings (user_id);
 
-create table if not exists public.investments (
+create table public.investments (
   id text primary key default gen_random_uuid()::text,
   user_id uuid not null references auth.users (id) on delete cascade,
   fund_id text references public.funds (id),
@@ -96,15 +88,14 @@ create table if not exists public.investments (
   country public.country_code not null,
   currency public.currency_code not null,
   invested_amount numeric not null check (invested_amount > 0),
-  units numeric,
   source_url text,
   last_synced_at timestamptz,
   created_at timestamptz not null default timezone('utc', now())
 );
 
-create index if not exists investments_user_idx on public.investments (user_id);
+create index investments_user_idx on public.investments (user_id);
 
-create table if not exists public.investment_syncs (
+create table public.investment_syncs (
   id text primary key default gen_random_uuid()::text,
   user_id uuid not null references auth.users (id) on delete cascade,
   investment_id text not null references public.investments (id) on delete cascade,
@@ -114,9 +105,9 @@ create table if not exists public.investment_syncs (
   error_message text
 );
 
-create index if not exists investment_syncs_investment_idx
+create index investment_syncs_investment_idx
   on public.investment_syncs (investment_id, started_at desc);
-create index if not exists investment_syncs_user_idx on public.investment_syncs (user_id);
+create index investment_syncs_user_idx on public.investment_syncs (user_id);
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -153,95 +144,95 @@ alter table public.fund_holdings enable row level security;
 alter table public.investments enable row level security;
 alter table public.investment_syncs enable row level security;
 
-drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles
   for select to authenticated using (id = auth.uid());
 
-drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles
   for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
 
-drop policy if exists "catalog_select" on public.securities;
-drop policy if exists "securities_insert" on public.securities;
-drop policy if exists "securities_select_own" on public.securities;
 create policy "securities_select_own" on public.securities
   for select to authenticated using (user_id = auth.uid());
 
-drop policy if exists "securities_insert_own" on public.securities;
 create policy "securities_insert_own" on public.securities
   for insert to authenticated with check (user_id = auth.uid());
 
-drop policy if exists "securities_update_own" on public.securities;
 create policy "securities_update_own" on public.securities
   for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-drop policy if exists "securities_delete_own" on public.securities;
 create policy "securities_delete_own" on public.securities
   for delete to authenticated using (user_id = auth.uid());
 
-drop policy if exists "funds_select" on public.funds;
-drop policy if exists "funds_update" on public.funds;
-drop policy if exists "funds_select_own" on public.funds;
 create policy "funds_select_own" on public.funds
   for select to authenticated using (user_id = auth.uid());
 
-drop policy if exists "funds_insert_own" on public.funds;
 create policy "funds_insert_own" on public.funds
   for insert to authenticated with check (user_id = auth.uid());
 
-drop policy if exists "funds_update_own" on public.funds;
 create policy "funds_update_own" on public.funds
   for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-drop policy if exists "funds_delete_own" on public.funds;
 create policy "funds_delete_own" on public.funds
   for delete to authenticated using (user_id = auth.uid());
 
-drop policy if exists "holdings_select" on public.fund_holdings;
-drop policy if exists "holdings_select_own" on public.fund_holdings;
 create policy "holdings_select_own" on public.fund_holdings
   for select to authenticated using (user_id = auth.uid());
 
-drop policy if exists "holdings_insert_own" on public.fund_holdings;
 create policy "holdings_insert_own" on public.fund_holdings
   for insert to authenticated with check (user_id = auth.uid());
 
-drop policy if exists "holdings_update_own" on public.fund_holdings;
 create policy "holdings_update_own" on public.fund_holdings
   for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-drop policy if exists "holdings_delete_own" on public.fund_holdings;
 create policy "holdings_delete_own" on public.fund_holdings
   for delete to authenticated using (user_id = auth.uid());
 
-drop policy if exists "investments_select_own" on public.investments;
 create policy "investments_select_own" on public.investments
   for select to authenticated using (user_id = auth.uid());
 
-drop policy if exists "investments_insert_own" on public.investments;
 create policy "investments_insert_own" on public.investments
   for insert to authenticated with check (user_id = auth.uid());
 
-drop policy if exists "investments_update_own" on public.investments;
 create policy "investments_update_own" on public.investments
   for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-drop policy if exists "investments_delete_own" on public.investments;
 create policy "investments_delete_own" on public.investments
   for delete to authenticated using (user_id = auth.uid());
 
-drop policy if exists "syncs_select_own" on public.investment_syncs;
 create policy "syncs_select_own" on public.investment_syncs
   for select to authenticated using (user_id = auth.uid());
 
-drop policy if exists "syncs_insert_own" on public.investment_syncs;
 create policy "syncs_insert_own" on public.investment_syncs
   for insert to authenticated with check (user_id = auth.uid());
 
-drop policy if exists "syncs_update_own" on public.investment_syncs;
 create policy "syncs_update_own" on public.investment_syncs
   for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-drop policy if exists "syncs_delete_own" on public.investment_syncs;
 create policy "syncs_delete_own" on public.investment_syncs
   for delete to authenticated using (user_id = auth.uid());
+
+create or replace function public.delete_own_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  delete from public.investment_syncs where user_id = uid;
+  delete from public.fund_holdings where user_id = uid;
+  delete from public.investments where user_id = uid;
+  delete from public.funds where user_id = uid;
+  delete from public.securities where user_id = uid;
+  delete from public.profiles where id = uid;
+  delete from auth.users where id = uid;
+end;
+$$;
+
+revoke all on function public.delete_own_account() from public;
+revoke all on function public.delete_own_account() from anon;
+grant execute on function public.delete_own_account() to authenticated;

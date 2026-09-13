@@ -24,15 +24,16 @@ export function PlaceholderPreview({
   hideAction?: boolean;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl">
+    <div className="relative rounded-xl">
       <div
         className="pointer-events-none select-none rounded-xl blur-[1.5px]"
         aria-hidden
       >
         {children}
       </div>
-      <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/35 p-3 sm:p-4">
-        <Card className="w-full max-w-75 shadow-lg">
+      <div className="pointer-events-none absolute inset-0 rounded-xl bg-background/35" />
+      <div className="pointer-events-none fixed inset-x-0 top-1/2 z-40 flex -translate-y-1/2 justify-center px-4">
+        <Card className="pointer-events-auto w-full max-w-75 shadow-lg">
           <CardHeader>
             <CardTitle className="text-balance">{title}</CardTitle>
             <CardDescription className="text-pretty">

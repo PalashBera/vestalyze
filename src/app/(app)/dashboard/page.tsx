@@ -39,7 +39,7 @@ function DashboardBody({ data, preview = false }: { data: PortfolioOverview; pre
             Direct holdings plus look-through allocations from mutual funds and ETFs.
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           {preview || data.topHoldings.length > 0 ? (
             <ExposureTable rows={data.topHoldings} disableLinks={preview} />
           ) : (

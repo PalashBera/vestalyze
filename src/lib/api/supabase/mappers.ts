@@ -11,7 +11,6 @@ export function mapSecurity(row: Tables["securities"]["Row"]): Security {
     ticker: row.ticker,
     country: row.country,
     currency: row.currency,
-    sector: row.sector,
   };
 }
 
@@ -51,7 +50,6 @@ export function mapInvestment(row: Tables["investments"]["Row"]): Investment {
     country: row.country,
     currency: row.currency,
     investedAmount: Number(row.invested_amount),
-    units: row.units == null ? undefined : Number(row.units),
     sourceUrl: row.source_url ?? undefined,
     lastSyncedAt: row.last_synced_at ?? undefined,
     createdAt: row.created_at,

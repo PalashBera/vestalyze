@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/page-loader";
 import { PlaceholderPreview } from "@/components/placeholder-preview";
+import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
 import {
   Table,
   TableBody,
@@ -17,6 +18,49 @@ import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import { formatPercent } from "@/lib/format";
 import { placeholderOverlaps } from "@/lib/placeholder/portfolio";
+
+function OverlapHoldings({
+  items,
+}: {
+  items: Array<{ securityId: string; name: string; allocationA: number; allocationB: number }>;
+}) {
+  return (
+    <>
+      <RecordList>
+        {items.map((item) => (
+          <RecordListItem
+            key={item.securityId}
+            title={item.name}
+            fields={[
+              { label: "Fund A", value: formatPercent(item.allocationA) },
+              { label: "Fund B", value: formatPercent(item.allocationB) },
+            ]}
+          />
+        ))}
+      </RecordList>
+      <DesktopTable>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Company</TableHead>
+              <TableHead className="text-right">Fund A</TableHead>
+              <TableHead className="text-right">Fund B</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => (
+              <TableRow key={item.securityId}>
+                <TableCell>{item.name}</TableCell>
+                <TableCell className="text-right">{formatPercent(item.allocationA)}</TableCell>
+                <TableCell className="text-right">{formatPercent(item.allocationB)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </DesktopTable>
+    </>
+  );
+}
 
 export default function OverlapPage() {
   const { data, error, loading } = useAsync(() => api.portfolio.overlap());
@@ -52,24 +96,7 @@ export default function OverlapPage() {
                   <CardDescription>Overlap score {formatPercent(overlap.overlapScore)}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Company</TableHead>
-                        <TableHead className="text-right">Fund A</TableHead>
-                        <TableHead className="text-right">Fund B</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {overlap.overlappingSecurities.map((item) => (
-                        <TableRow key={item.securityId}>
-                          <TableCell>{item.name}</TableCell>
-                          <TableCell className="text-right">{formatPercent(item.allocationA)}</TableCell>
-                          <TableCell className="text-right">{formatPercent(item.allocationB)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <OverlapHoldings items={overlap.overlappingSecurities} />
                 </CardContent>
               </Card>
             ))}
@@ -84,25 +111,8 @@ export default function OverlapPage() {
             </CardTitle>
             <CardDescription>Overlap score {formatPercent(overlap.overlapScore)}</CardDescription>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Company</TableHead>
-                  <TableHead className="text-right">Fund A</TableHead>
-                  <TableHead className="text-right">Fund B</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {overlap.overlappingSecurities.map((item) => (
-                  <TableRow key={item.securityId}>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell className="text-right">{formatPercent(item.allocationA)}</TableCell>
-                    <TableCell className="text-right">{formatPercent(item.allocationB)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <CardContent>
+            <OverlapHoldings items={overlap.overlappingSecurities} />
           </CardContent>
         </Card>
       ))}

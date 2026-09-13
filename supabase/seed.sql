@@ -1,2 +1,3 @@
--- Catalog is user-built through onboarding. No sample portfolio is loaded.
--- FX defaults live on public.profiles (fx_usd_inr, fx_as_of).
+-- No seed rows. Vestalyze is a personal app: each account starts empty
+-- after signup. Sample holdings on the landing page and dashboard empty
+-- state are client-side placeholders only.

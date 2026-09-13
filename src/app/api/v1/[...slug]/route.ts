@@ -3,6 +3,7 @@ import { errorFromUnknown, jsonError, jsonOk } from "@/lib/api/http";
 import {
   supabaseAllocation,
   supabaseCreateInvestment,
+  supabaseDeleteAccount,
   supabaseDeleteInvestment,
   supabaseExposure,
   supabaseExposureDetail,
@@ -26,9 +27,12 @@ import {
   supabaseSyncInvestment,
   supabaseUpdateFxRate,
   supabaseUpdateInvestment,
+  supabaseUpdatePassword,
+  supabaseUpdateProfile,
   supabaseUpdateSettings,
 } from "@/lib/api/supabase/handlers";
 import { consumeAuthAttempt, consumeExtractAttempt } from "@/lib/auth/rate-limit";
+import { sendContactMessage, type ContactInput } from "@/lib/email/contact";
 import { requireUserId } from "@/lib/auth/user";
 import { isValidEmail, isValidPassword } from "@/lib/auth/password";
 
@@ -75,10 +79,51 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
     return jsonOk({ ok: true });
   }
 
+  if (path === "contact" && method === "POST") {
+    const limit = consumeAuthAttempt(`contact:${clientKey(request)}`);
+    if (!limit.allowed) {
+      return jsonError("Too many messages. Try again later.", 429);
+    }
+    const body = (await request.json()) as ContactInput;
+    return jsonOk(await sendContactMessage(body, request.nextUrl.origin));
+  }
+
   const userId = await requireUserId();
 
   if (path === "auth/me" && method === "GET") {
     return jsonOk({ user: await supabaseMe(userId) });
+  }
+
+  if (path === "auth/profile" && method === "PATCH") {
+    const limit = consumeAuthAttempt(`profile:${clientKey(request)}`);
+    if (!limit.allowed) {
+      return jsonError("Too many attempts. Try again later.", 429);
+    }
+    const body = (await request.json()) as { name?: string; email?: string };
+    return jsonOk(await supabaseUpdateProfile(userId, body));
+  }
+
+  if (path === "auth/password" && method === "PATCH") {
+    const limit = consumeAuthAttempt(`password:${clientKey(request)}`);
+    if (!limit.allowed) {
+      return jsonError("Too many attempts. Try again later.", 429);
+    }
+    const body = (await request.json()) as { currentPassword?: string; newPassword?: string };
+    return jsonOk(
+      await supabaseUpdatePassword(userId, {
+        currentPassword: body.currentPassword ?? "",
+        newPassword: body.newPassword ?? "",
+      }),
+    );
+  }
+
+  if (path === "auth/account" && method === "DELETE") {
+    const limit = consumeAuthAttempt(`delete:${clientKey(request)}`);
+    if (!limit.allowed) {
+      return jsonError("Too many attempts. Try again later.", 429);
+    }
+    const body = (await request.json()) as { password?: string };
+    return jsonOk(await supabaseDeleteAccount(userId, body.password ?? ""));
   }
 
   if (path === "investments" && method === "GET") {

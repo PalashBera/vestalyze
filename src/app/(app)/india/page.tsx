@@ -48,7 +48,7 @@ function IndiaBody({
           <CardTitle>Consolidated Indian stock exposure</CardTitle>
           <CardDescription>Same company combined across funds, ETFs, and direct holdings.</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           {emptyExposure ? (
             <PlaceholderPreview
               title="No stock exposure yet"
