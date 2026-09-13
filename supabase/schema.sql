@@ -8,10 +8,16 @@
 --      effective exposure is computed at read time, never persisted.
 --   3. fund_holdings holds the latest snapshot only. A sync replaces the rows
 --      for that fund, so there is no per-row history to date-stamp.
+--   4. In the portfolio book, investments.invested_amount is the only money
+--      column. stock_trades and stock_analysis are a separate trade journal
+--      and watchlist: they carry their own prices and never reach the
+--      dashboard, market, exposure, or overlap pages.
 --
 -- See docs/SCHEMA_GUIDE.md for the per-column feature mapping.
 
 drop function if exists public.delete_own_account() cascade;
+drop table if exists public.stock_analysis cascade;
+drop table if exists public.stock_trades cascade;
 drop table if exists public.investment_syncs cascade;
 drop table if exists public.fund_holdings cascade;
 drop table if exists public.investments cascade;
@@ -214,6 +220,74 @@ comment on column public.investment_syncs.status is
 comment on column public.investment_syncs.records_processed is 'Holdings written on success. Zero on failure.';
 comment on column public.investment_syncs.error_message is 'Failure reason shown in sync history. Null on success.';
 
+-- stock_trades --------------------------------------------------------------
+-- A trade journal, independent of the look-through portfolio above. Nothing
+-- here feeds dashboard totals. A trade with no sell is still open, so the sell
+-- columns are nullable and must be filled in as a pair.
+
+create table public.stock_trades (
+  id text primary key default gen_random_uuid()::text,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 120),
+  symbol text not null check (char_length(symbol) between 1 and 20),
+  buy_date date not null,
+  buy_price numeric not null check (buy_price > 0),
+  quantity numeric not null check (quantity > 0),
+  sell_date date,
+  sell_price numeric check (sell_price >= 0),
+  created_at timestamptz not null default timezone('utc', now()),
+  constraint stock_trades_sell_pair check (
+    (sell_date is null) = (sell_price is null)
+  ),
+  constraint stock_trades_sell_after_buy check (
+    sell_date is null or sell_date >= buy_date
+  )
+);
+
+create index stock_trades_user_idx on public.stock_trades (user_id, buy_date desc);
+
+comment on table public.stock_trades is
+  'Realised and open stock trades. A standalone journal: these rows never affect portfolio totals or look-through exposure.';
+comment on column public.stock_trades.id is 'Generated uuid.';
+comment on column public.stock_trades.user_id is 'Owner. RLS filters on this column.';
+comment on column public.stock_trades.name is 'Company name as the user typed it.';
+comment on column public.stock_trades.symbol is 'Exchange symbol, uppercased on write. Groups trades in the same company.';
+comment on column public.stock_trades.buy_date is 'Purchase date. Start of the holding duration.';
+comment on column public.stock_trades.buy_price is 'Price per share paid. Multiplied by quantity to get the total purchase amount.';
+comment on column public.stock_trades.quantity is 'Shares bought. Numeric rather than integer so fractional lots are allowed.';
+comment on column public.stock_trades.sell_date is 'Sale date, or null while the trade is open. End of the holding duration.';
+comment on column public.stock_trades.sell_price is
+  'Price per share received, or null while the trade is open. Paired with sell_date by stock_trades_sell_pair.';
+comment on column public.stock_trades.created_at is 'Row creation timestamp.';
+
+-- stock_analysis ------------------------------------------------------------
+-- A watchlist of price targets. Target price is derived, never stored.
+
+create table public.stock_analysis (
+  id text primary key default gen_random_uuid()::text,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 120),
+  symbol text not null check (char_length(symbol) between 1 and 20),
+  buy_date date not null,
+  buy_price numeric not null check (buy_price > 0),
+  target_return_percentage numeric not null check (target_return_percentage > 0),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index stock_analysis_user_idx on public.stock_analysis (user_id, created_at desc);
+
+comment on table public.stock_analysis is
+  'Price targets the user is tracking. Standalone, like stock_trades: nothing here reaches the portfolio pages.';
+comment on column public.stock_analysis.id is 'Generated uuid.';
+comment on column public.stock_analysis.user_id is 'Owner. RLS filters on this column.';
+comment on column public.stock_analysis.name is 'Company name as the user typed it.';
+comment on column public.stock_analysis.symbol is 'Exchange symbol, uppercased on write.';
+comment on column public.stock_analysis.buy_date is 'Date the entry price was taken.';
+comment on column public.stock_analysis.buy_price is 'Entry price per share. The base the target is calculated from.';
+comment on column public.stock_analysis.target_return_percentage is
+  'Return the user is aiming for. Target price is buy_price * (1 + this / 100), computed at read time and never stored.';
+comment on column public.stock_analysis.created_at is 'Row creation timestamp.';
+
 -- new user trigger ----------------------------------------------------------
 
 create or replace function public.handle_new_user()
@@ -256,6 +330,8 @@ alter table public.funds enable row level security;
 alter table public.fund_holdings enable row level security;
 alter table public.investments enable row level security;
 alter table public.investment_syncs enable row level security;
+alter table public.stock_trades enable row level security;
+alter table public.stock_analysis enable row level security;
 
 create policy "profiles_select_own" on public.profiles
   for select to authenticated using (id = auth.uid());
@@ -323,6 +399,30 @@ create policy "syncs_update_own" on public.investment_syncs
 create policy "syncs_delete_own" on public.investment_syncs
   for delete to authenticated using (user_id = auth.uid());
 
+create policy "trades_select_own" on public.stock_trades
+  for select to authenticated using (user_id = auth.uid());
+
+create policy "trades_insert_own" on public.stock_trades
+  for insert to authenticated with check (user_id = auth.uid());
+
+create policy "trades_update_own" on public.stock_trades
+  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy "trades_delete_own" on public.stock_trades
+  for delete to authenticated using (user_id = auth.uid());
+
+create policy "analysis_select_own" on public.stock_analysis
+  for select to authenticated using (user_id = auth.uid());
+
+create policy "analysis_insert_own" on public.stock_analysis
+  for insert to authenticated with check (user_id = auth.uid());
+
+create policy "analysis_update_own" on public.stock_analysis
+  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy "analysis_delete_own" on public.stock_analysis
+  for delete to authenticated using (user_id = auth.uid());
+
 -- account deletion ----------------------------------------------------------
 
 create or replace function public.delete_own_account()
@@ -338,6 +438,8 @@ begin
     raise exception 'Not authenticated';
   end if;
 
+  delete from public.stock_analysis where user_id = uid;
+  delete from public.stock_trades where user_id = uid;
   delete from public.investment_syncs where user_id = uid;
   delete from public.fund_holdings where user_id = uid;
   delete from public.investments where user_id = uid;

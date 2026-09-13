@@ -54,7 +54,7 @@ In the Supabase SQL editor, run in order:
 1. [`supabase/schema.sql`](../supabase/schema.sql) — drops existing app tables, then creates tables, trigger, and owner-only RLS
 2. [`supabase/seed.sql`](../supabase/seed.sql) — notes only; FX defaults live on `profiles`
 
-`schema.sql` wipes `profiles`, `securities`, `funds`, `fund_holdings`, `investments`, and `investment_syncs`. It does not drop `auth.users`. After a reset, existing accounts need a new profile row (sign up again, or insert into `profiles`).
+`schema.sql` wipes `profiles`, `securities`, `funds`, `fund_holdings`, `investments`, `investment_syncs`, `stock_trades`, and `stock_analysis`. It does not drop `auth.users`. After a reset, existing accounts need a new profile row (sign up again, or insert into `profiles`).
 
 There is no sample portfolio. New users add holdings in onboarding. Company names from fund syncs and direct stocks they enter are stored in `securities` under their `user_id`.
 
@@ -76,6 +76,10 @@ Every column also carries a Postgres comment, so the Supabase table editor expla
 | `fund_holdings`    | `id`, `user_id`, `fund_id`, `security_id`, `allocation_percentage`                                                                   | Owner CRUD                          |
 | `investments`      | `id`, `user_id`, `fund_id`, `security_id`, `name`, `type`, `country`, `invested_amount`, `source_url`, `last_synced_at`, `created_at` | Owner CRUD                          |
 | `investment_syncs` | `id`, `user_id`, `investment_id`, `started_at`, `status`, `records_processed`, `error_message`                                       | Owner CRUD                          |
+| `stock_trades`     | `id`, `user_id`, `name`, `symbol`, `buy_date`, `buy_price`, `quantity`, `sell_date`, `sell_price`, `created_at`                       | Owner CRUD                          |
+| `stock_analysis`   | `id`, `user_id`, `name`, `symbol`, `buy_date`, `buy_price`, `target_return_percentage`, `created_at`                                  | Owner CRUD                          |
+
+`stock_trades` and `stock_analysis` back the Stock Trades and Stock Analysis screens. They are owned per user like everything else, but join to nothing: no portfolio query reads them, and they never affect dashboard totals or look-through exposure.
 
 Deliberately absent, and why:
 
@@ -112,7 +116,7 @@ Password rules in the app: 8–128 characters. Paste is allowed.
 
 If Confirm email is on and there is no session after signup, the API returns: `Account created. Confirm the email before signing in.`
 
-Account deletion requires the current password. The BFF then calls `delete_own_account()`, a security-definer function that removes the caller’s `investment_syncs`, `fund_holdings`, `investments`, `funds`, `securities`, `profiles`, and `auth.users` row. Other accounts are untouched.
+Account deletion requires the current password. The BFF then calls `delete_own_account()`, a security-definer function that removes the caller’s `stock_analysis`, `stock_trades`, `investment_syncs`, `fund_holdings`, `investments`, `funds`, `securities`, `profiles`, and `auth.users` row. Other accounts are untouched.
 
 ---
 
@@ -129,6 +133,10 @@ Handlers in `src/lib/api/supabase/handlers.ts` run for every `/api/v1` request. 
 | GET              | `/funds`, `/funds/:id`, `/funds/:id/holdings` | Owner catalog                                       |
 | GET              | `/securities`, `/securities/:id`              | Owner security master                               |
 | GET              | `/portfolio/*`                                | Load investments + holdings, then `src/lib/finance` |
+| GET/POST         | `/trades`                                     | `stock_trades` select / insert                      |
+| PATCH/DELETE     | `/trades/:id`                                 | Scoped by `user_id`                                 |
+| GET/POST         | `/analysis`                                   | `stock_analysis` select / insert                    |
+| PATCH/DELETE     | `/analysis/:id`                               | Scoped by `user_id`                                 |
 | GET/PATCH        | `/settings`                                   | `profiles.display_currency`                         |
 | GET/PATCH        | `/fx/rate`                                    | `profiles.fx_usd_inr` / `fx_as_of`                  |
 | DELETE           | `/auth/account`                               | Password check, then `delete_own_account()`         |

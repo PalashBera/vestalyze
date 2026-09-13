@@ -2,9 +2,13 @@ import { NextRequest } from "next/server";
 import { errorFromUnknown, jsonError, jsonOk } from "@/lib/api/http";
 import {
   supabaseAllocation,
+  supabaseCreateAnalysis,
   supabaseCreateInvestment,
+  supabaseCreateTrade,
   supabaseDeleteAccount,
+  supabaseDeleteAnalysis,
   supabaseDeleteInvestment,
+  supabaseDeleteTrade,
   supabaseExposure,
   supabaseExposureDetail,
   supabaseFxRate,
@@ -12,10 +16,12 @@ import {
   supabaseGetInvestment,
   supabaseGetSecurity,
   supabaseGetSettings,
+  supabaseListAnalysis,
   supabaseListFunds,
   supabaseListInvestments,
   supabaseListSecurities,
   supabaseListSyncs,
+  supabaseListTrades,
   supabaseLogin,
   supabaseLogout,
   supabaseMarket,
@@ -24,8 +30,10 @@ import {
   supabaseOverview,
   supabaseRegister,
   supabaseSyncInvestment,
+  supabaseUpdateAnalysis,
   supabaseUpdateFxRate,
   supabaseUpdateInvestment,
+  supabaseUpdateTrade,
   supabaseUpdatePassword,
   supabaseUpdateProfile,
   supabaseUpdateSettings,
@@ -206,6 +214,38 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
   }
   if (path === "portfolio/overlap" && method === "GET") {
     return jsonOk({ overlaps: await supabaseOverlap(userId) });
+  }
+
+  if (path === "trades" && method === "GET") {
+    return jsonOk({ trades: await supabaseListTrades(userId) });
+  }
+  if (path === "trades" && method === "POST") {
+    const input = await request.json();
+    return jsonOk({ trade: await supabaseCreateTrade(userId, input) }, { status: 201 });
+  }
+  const tradeMatch = path.match(/^trades\/([^/]+)$/);
+  if (tradeMatch && method === "PATCH") {
+    const input = await request.json();
+    return jsonOk({ trade: await supabaseUpdateTrade(userId, tradeMatch[1], input) });
+  }
+  if (tradeMatch && method === "DELETE") {
+    return jsonOk(await supabaseDeleteTrade(userId, tradeMatch[1]));
+  }
+
+  if (path === "analysis" && method === "GET") {
+    return jsonOk({ entries: await supabaseListAnalysis(userId) });
+  }
+  if (path === "analysis" && method === "POST") {
+    const input = await request.json();
+    return jsonOk({ entry: await supabaseCreateAnalysis(userId, input) }, { status: 201 });
+  }
+  const analysisMatch = path.match(/^analysis\/([^/]+)$/);
+  if (analysisMatch && method === "PATCH") {
+    const input = await request.json();
+    return jsonOk({ entry: await supabaseUpdateAnalysis(userId, analysisMatch[1], input) });
+  }
+  if (analysisMatch && method === "DELETE") {
+    return jsonOk(await supabaseDeleteAnalysis(userId, analysisMatch[1]));
   }
 
   if (path === "settings" && method === "GET") {

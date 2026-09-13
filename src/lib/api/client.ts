@@ -7,10 +7,14 @@ import type {
   FxRate,
   Investment,
   InvestmentSync,
+  CreateStockAnalysisRequest,
+  CreateStockTradeRequest,
   MarketDashboard,
   PortfolioOverview,
   Security,
+  StockAnalysis,
   StockExposure,
+  StockTrade,
   User,
   UserSettings,
 } from "@/lib/api/types";
@@ -109,6 +113,34 @@ export const api = {
         stocks: AllocationSlice[];
       }>("/portfolio/allocation"),
     overlap: () => request<{ overlaps: FundOverlap[] }>("/portfolio/overlap"),
+  },
+  trades: {
+    list: () => request<{ trades: StockTrade[] }>("/trades"),
+    create: (input: CreateStockTradeRequest) =>
+      request<{ trade: StockTrade }>("/trades", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    update: (id: string, input: CreateStockTradeRequest) =>
+      request<{ trade: StockTrade }>(`/trades/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    remove: (id: string) => request<{ ok: boolean }>(`/trades/${id}`, { method: "DELETE" }),
+  },
+  analysis: {
+    list: () => request<{ entries: StockAnalysis[] }>("/analysis"),
+    create: (input: CreateStockAnalysisRequest) =>
+      request<{ entry: StockAnalysis }>("/analysis", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    update: (id: string, input: CreateStockAnalysisRequest) =>
+      request<{ entry: StockAnalysis }>(`/analysis/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    remove: (id: string) => request<{ ok: boolean }>(`/analysis/${id}`, { method: "DELETE" }),
   },
   catalog: {
     funds: () => request<{ funds: Fund[] }>("/funds"),

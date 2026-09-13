@@ -17,7 +17,20 @@ Every column below is justified against these. A column that breaks one of them 
 1. **Owner-scoped.** Every table carries `user_id` (or is keyed by it) so an RLS policy can filter without a join. This is the one denormalisation the schema allows, and it is deliberate.
 2. **Nothing derivable is stored.** If a value can be computed from another column, it is computed. Currency comes from country. Exposure comes from amount times weight. Neither is persisted.
 3. **Latest snapshot, not history.** `fund_holdings` is replaced wholesale on each sync. The only history the product keeps is `investment_syncs`, and that is an audit log, not portfolio history.
-4. **One home for money.** `investments.invested_amount` is the only money column. Every figure on every screen traces back to it.
+4. **One home for money in the portfolio book.** `investments.invested_amount` is the only money column feeding the dashboard, market, exposure, and overlap screens. Every figure on those screens traces back to it. `stock_trades` and `stock_analysis` sit outside that book — see below.
+
+### The two standalone tables
+
+`stock_trades` and `stock_analysis` are a trade journal and a price-target watchlist. They follow rules 1 and 2 like everything else, but they are deliberately **not** part of the portfolio book: no handler joins them to `investments`, and nothing they contain reaches the dashboard, market, exposure, or overlap screens. That separation is the point — a closed trade is not a holding, and a price target is not an amount invested. Keep it that way, or the totals on `/dashboard` stop meaning one thing.
+
+```sql
+-- Nothing in the portfolio path may reference the journal tables.
+select 1 from information_schema.columns
+where table_schema = 'public'
+  and table_name in ('investments', 'funds', 'fund_holdings', 'securities', 'investment_syncs')
+  and column_name in ('trade_id', 'analysis_id');
+-- Expect: zero rows.
+```
 
 ### Verifying the rules hold
 
@@ -49,12 +62,14 @@ where table_schema = 'public' and column_name = 'currency';
 -- Expect: zero rows. Only profiles.display_currency exists, and it is a
 -- reporting preference, not the currency of a position.
 
--- Rule 4: invested_amount is the only money column.
+-- Rule 4: invested_amount is the only money column in the portfolio book.
 select table_name, column_name
 from information_schema.columns
-where table_schema = 'public' and data_type = 'numeric';
+where table_schema = 'public' and data_type = 'numeric'
+  and table_name not in ('stock_trades', 'stock_analysis');
 -- Expect: profiles.fx_usd_inr, investments.invested_amount,
 -- fund_holdings.allocation_percentage. Nothing else.
+-- The journal tables carry their own prices and are excluded on purpose.
 ```
 
 Every column also carries a Postgres comment, visible in the Supabase table editor:
@@ -86,6 +101,8 @@ Start here to know what a change can affect.
 | Company exposure      | `/exposure`, `/exposure/[securityId]` | `investments`, `fund_holdings`, `securities`                      | —                                                                         |
 | Fund overlap          | `/overlap`                            | `investments`, `fund_holdings`, `funds`, `securities`             | —                                                                         |
 | India / US views      | `/india`, `/us`                       | `investments`, `fund_holdings`, `securities`, `profiles`          | —                                                                         |
+| Stock trades          | `/trades`                             | `stock_trades`                                                    | `stock_trades`                                                            |
+| Stock analysis        | `/analysis`                           | `stock_analysis`                                                  | `stock_analysis`                                                          |
 | Settings and FX       | `/settings`                           | `profiles`                                                        | `profiles`                                                                |
 | Delete account        | `/settings`                           | —                                                                 | all, via `delete_own_account()`                                           |
 
@@ -249,6 +266,70 @@ select * from investment_syncs
 where status = 'running' and started_at < now() - interval '15 minutes';
 -- Expect: zero rows in normal operation.
 ```
+
+---
+
+## `stock_trades`
+
+The trade journal behind `/trades`. Amounts are INR. A row with no sale is an open position; the sale columns are filled in later when it closes.
+
+| Column       | Feature                                | Written by                              | Read by                            | How to verify                                                                                     |
+| ------------ | -------------------------------------- | --------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `id`         | Row key for edit and delete            | Default `gen_random_uuid()::text`       | `PATCH` / `DELETE /trades/:id`     | —                                                                                                 |
+| `user_id`    | Isolation                              | `supabaseCreateTrade`                   | RLS                                | Sign in as another account; the list comes back empty.                                            |
+| `name`       | First column of the table              | The form, trimmed                       | `/trades`                          | A blank or whitespace-only name is rejected with a 400.                                           |
+| `symbol`     | Symbol badge, grouping the same ticker | The form, via `normalizeTicker`         | `/trades`                          | Enter `hdfcbank`; it is stored and displayed as `HDFCBANK`.                                       |
+| `buy_date`   | Buy date column, start of duration     | The form                                | `tradeMetrics` in `finance/trades` | A non-date value is rejected with a 400.                                                          |
+| `buy_price`  | Buying price, and Total Pur Amt        | The form                                | `tradeMetrics`                     | Total Pur Amt equals `buy_price × quantity`. Zero and negatives are rejected by a check.          |
+| `quantity`   | Quantity column, both total amounts    | The form                                | `tradeMetrics`                     | Change the quantity; both totals and the return move with it.                                     |
+| `sell_date`  | Sell date, end of duration             | The form, or null while open            | `tradeMetrics`                     | An open trade shows an Open badge and its duration counts to today. A sell before the buy is 400. |
+| `sell_price` | Selling price, and Total Sold Amt      | The form, or null while open            | `tradeMetrics`                     | Supplying one sale field without the other is rejected with a 400.                                |
+| `created_at` | Tie-break for same-day trades          | Column default                          | List ordering                      | —                                                                                                 |
+
+Total Pur Amt, Total Sold Amt, Return Amt, Return and Duration are **not** columns. All five are computed by `tradeMetrics` in `src/lib/finance/trades.ts`:
+
+```text
+total_purchase = buy_price × quantity
+total_sold     = sell_price × quantity          (closed trades only)
+return_amount  = total_sold − total_purchase    (closed trades only)
+return_pct     = return_amount / total_purchase × 100
+duration_days  = (sell_date ?? today) − buy_date
+```
+
+```sql
+-- The sale columns must be set together or not at all.
+select id from stock_trades where (sell_date is null) <> (sell_price is null);
+-- Expect: zero rows. stock_trades_sell_pair enforces it.
+
+-- A sale can never precede its purchase.
+select id from stock_trades where sell_date < buy_date;
+-- Expect: zero rows.
+```
+
+---
+
+## `stock_analysis`
+
+The watchlist behind `/analysis`. Amounts are INR.
+
+| Column                     | Feature                       | Written by                        | Read by       | How to verify                                                        |
+| -------------------------- | ----------------------------- | --------------------------------- | ------------- | ---------------------------------------------------------------------- |
+| `id`                       | Row key for edit and delete    | Default `gen_random_uuid()::text` | `/analysis/:id` | —                                                                    |
+| `user_id`                  | Isolation                     | `supabaseCreateAnalysis`          | RLS           | As above.                                                            |
+| `name`                     | First column of the table     | The form, trimmed                 | `/analysis`   | —                                                                    |
+| `symbol`                   | Symbol badge                  | The form, via `normalizeTicker`   | `/analysis`   | Lowercase input is stored uppercased.                                |
+| `buy_date`                 | Buy date column               | The form                          | `/analysis`   | —                                                                    |
+| `buy_price`                | Buying price, base of target  | The form                          | `targetPrice` | Halve the price and the target price halves with it.                 |
+| `target_return_percentage` | Target Return % column        | The form                          | `targetPrice` | A zero or negative target is rejected by a check constraint.         |
+| `created_at`               | List ordering, newest first   | Column default                    | `/analysis`   | —                                                                    |
+
+Target Price is derived, never stored — `targetPrice()` in `src/lib/finance/trades.ts`:
+
+```text
+target_price = buy_price × (1 + target_return_percentage / 100)
+```
+
+Storing it would let the two drift apart the moment someone edited the entry price, which is exactly the situation rule 2 exists to prevent.
 
 ---
 

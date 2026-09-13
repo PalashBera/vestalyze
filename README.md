@@ -55,6 +55,8 @@ acknowledgement needs a verified domain.
 - Sort consolidated stock exposure by company, market, total, and weight
 - Open look-through holdings and company drill-down
 - Paste a fund URL on an investment and sync the stock split from the holdings section
+- Keep a trade journal on Stock Trades, with purchase and sale totals, return, and holding period worked out from the buy and sell you enter — leave the sale blank and the trade stays open
+- Track price targets on Stock Analysis, where the target price follows from your entry price and the return you are aiming for
 - Switch display currency (INR / USD), set your USD/INR rate, and pick a theme (light / dark / system)
 - Delete your account from Settings — that also erases every holding stored with it
 - Send a note from the landing page contact form; the team is notified and the sender gets a receipt

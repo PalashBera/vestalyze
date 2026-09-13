@@ -1,5 +1,7 @@
 import type {
   CreateInvestmentRequest,
+  CreateStockAnalysisRequest,
+  CreateStockTradeRequest,
   Currency,
   LoginRequest,
   RegisterRequest,
@@ -14,16 +16,18 @@ import {
   calculateExposures,
 } from "@/lib/finance/exposure";
 import { getFxRate } from "@/lib/finance/currency";
-import { buildSecurityFromCompany, buildSecurityFromInput } from "@/lib/investments/security";
+import { buildSecurityFromCompany, buildSecurityFromInput, normalizeTicker } from "@/lib/investments/security";
 import { isFundVehicle, normalizeSourceUrl } from "@/lib/investments/fund-url";
 import { scrapeFundHoldings } from "@/lib/extract/holdings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  mapAnalysis,
   mapFund,
   mapHolding,
   mapInvestment,
   mapSecurity,
   mapSync,
+  mapTrade,
   mapUser,
   throwQueryError,
 } from "@/lib/api/supabase/mappers";
@@ -774,4 +778,190 @@ export async function supabaseUpdateFxRate(userId: string, rate: number) {
     throwQueryError("Unauthorized", 401);
   }
   return getFxRate({ rate: Number(data.fx_usd_inr), asOf: data.fx_as_of });
+}
+
+// Stock Trades and Stock Analysis ------------------------------------------
+// A standalone journal and watchlist. Neither touches the portfolio tables,
+// and both store INR amounts only.
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function cleanDate(value: unknown, label: string): string {
+  const text = String(value ?? "").trim();
+  if (!DATE_PATTERN.test(text) || Number.isNaN(Date.parse(`${text}T00:00:00Z`))) {
+    throwQueryError(`${label} must be a valid date.`, 400);
+  }
+  return text;
+}
+
+function cleanText(value: unknown, label: string, max: number): string {
+  const text = String(value ?? "").trim();
+  if (!text || text.length > max) {
+    throwQueryError(`${label} must be between 1 and ${max} characters.`, 400);
+  }
+  return text;
+}
+
+function cleanAmount(value: unknown, label: string, { allowZero = false } = {}): number {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0 || (!allowZero && amount <= 0)) {
+    throwQueryError(`${label} must be a positive number.`, 400);
+  }
+  return amount;
+}
+
+function cleanSymbol(value: unknown): string {
+  const symbol = normalizeTicker(String(value ?? ""));
+  if (!symbol || symbol.length > 20) {
+    throwQueryError("Symbol must be between 1 and 20 characters.", 400);
+  }
+  return symbol;
+}
+
+function tradeRowFromInput(input: CreateStockTradeRequest) {
+  const buyDate = cleanDate(input.buyDate, "Buy date");
+  const hasSellDate = Boolean(String(input.sellDate ?? "").trim());
+  const hasSellPrice = input.sellPrice !== undefined && input.sellPrice !== null && String(input.sellPrice) !== "";
+
+  if (hasSellDate !== hasSellPrice) {
+    throwQueryError("Enter both a sell date and a selling price, or leave both empty.", 400);
+  }
+
+  const sellDate = hasSellDate ? cleanDate(input.sellDate, "Sell date") : null;
+  if (sellDate && sellDate < buyDate) {
+    throwQueryError("Sell date cannot be before the buy date.", 400);
+  }
+
+  return {
+    name: cleanText(input.name, "Name", 120),
+    symbol: cleanSymbol(input.symbol),
+    buy_date: buyDate,
+    buy_price: cleanAmount(input.buyPrice, "Buying price"),
+    quantity: cleanAmount(input.quantity, "Quantity"),
+    sell_date: sellDate,
+    sell_price: hasSellPrice ? cleanAmount(input.sellPrice, "Selling price", { allowZero: true }) : null,
+  };
+}
+
+export async function supabaseListTrades(userId: string) {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("stock_trades")
+    .select("*")
+    .eq("user_id", userId)
+    .order("buy_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) {
+    throwQueryError("Unable to load trades.", 500);
+  }
+  return (data ?? []).map(mapTrade);
+}
+
+export async function supabaseCreateTrade(userId: string, input: CreateStockTradeRequest) {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("stock_trades")
+    .insert({ user_id: userId, ...tradeRowFromInput(input) })
+    .select("*")
+    .single();
+  if (error || !data) {
+    throwQueryError("Unable to save the trade.", 400);
+  }
+  return mapTrade(data);
+}
+
+export async function supabaseUpdateTrade(userId: string, id: string, input: CreateStockTradeRequest) {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("stock_trades")
+    .update(tradeRowFromInput(input))
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error || !data) {
+    throwQueryError("Trade not found", 404);
+  }
+  return mapTrade(data);
+}
+
+export async function supabaseDeleteTrade(userId: string, id: string) {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("stock_trades")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) {
+    throwQueryError("Trade not found", 404);
+  }
+  return { ok: true };
+}
+
+function analysisRowFromInput(input: CreateStockAnalysisRequest) {
+  return {
+    name: cleanText(input.name, "Name", 120),
+    symbol: cleanSymbol(input.symbol),
+    buy_date: cleanDate(input.buyDate, "Buy date"),
+    buy_price: cleanAmount(input.buyPrice, "Buying price"),
+    target_return_percentage: cleanAmount(input.targetReturnPercentage, "Target return"),
+  };
+}
+
+export async function supabaseListAnalysis(userId: string) {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("stock_analysis")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) {
+    throwQueryError("Unable to load stock analysis.", 500);
+  }
+  return (data ?? []).map(mapAnalysis);
+}
+
+export async function supabaseCreateAnalysis(userId: string, input: CreateStockAnalysisRequest) {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("stock_analysis")
+    .insert({ user_id: userId, ...analysisRowFromInput(input) })
+    .select("*")
+    .single();
+  if (error || !data) {
+    throwQueryError("Unable to save the analysis entry.", 400);
+  }
+  return mapAnalysis(data);
+}
+
+export async function supabaseUpdateAnalysis(userId: string, id: string, input: CreateStockAnalysisRequest) {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("stock_analysis")
+    .update(analysisRowFromInput(input))
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error || !data) {
+    throwQueryError("Analysis entry not found", 404);
+  }
+  return mapAnalysis(data);
+}
+
+export async function supabaseDeleteAnalysis(userId: string, id: string) {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("stock_analysis")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) {
+    throwQueryError("Analysis entry not found", 404);
+  }
+  return { ok: true };
 }

@@ -124,6 +124,72 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["investment_syncs"]["Row"]>;
         Relationships: [];
       };
+      stock_trades: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          symbol: string;
+          buy_date: string;
+          buy_price: number;
+          quantity: number;
+          sell_date: string | null;
+          sell_price: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          symbol: string;
+          buy_date: string;
+          buy_price: number;
+          quantity: number;
+          sell_date?: string | null;
+          sell_price?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          symbol?: string;
+          buy_date?: string;
+          buy_price?: number;
+          quantity?: number;
+          sell_date?: string | null;
+          sell_price?: number | null;
+        };
+        Relationships: [];
+      };
+      stock_analysis: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          symbol: string;
+          buy_date: string;
+          buy_price: number;
+          target_return_percentage: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          symbol: string;
+          buy_date: string;
+          buy_price: number;
+          target_return_percentage: number;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          symbol?: string;
+          buy_date?: string;
+          buy_price?: number;
+          target_return_percentage?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

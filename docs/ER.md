@@ -1,6 +1,6 @@
 # Vestalyze data model
 
-This is the current Supabase schema: six public tables plus `auth.users` (managed by Supabase Auth). The source of truth is [`supabase/schema.sql`](../supabase/schema.sql). Setup and RLS live in [SUPABASE.md](./SUPABASE.md).
+This is the current Supabase schema: eight public tables plus `auth.users` (managed by Supabase Auth). The source of truth is [`supabase/schema.sql`](../supabase/schema.sql). Setup and RLS live in [SUPABASE.md](./SUPABASE.md).
 
 Every public row is owned by one account. Look-through math is not stored: the API loads investments + holdings and computes exposure in `src/lib/finance`.
 
@@ -10,13 +10,20 @@ effective_exposure = invested_amount × (allocation_percentage / 100)
 
 The same company is then summed across mutual funds, ETFs, and direct stocks.
 
+`stock_trades` and `stock_analysis` sit apart from that calculation. They are a trade journal and a
+price-target watchlist, owned by the same user but joined to nothing — see the note under the diagram.
+
 ---
 
 ## Entity-relationship diagram
 
-![Vestalyze ER diagram: auth.users connects one-to-one to profiles and one-to-many to securities, funds, fund_holdings, investments, and investment_syncs. Funds and securities both feed fund_holdings and investments. Investments feed investment_syncs.](./images/er-diagram.png)
+![Vestalyze ER diagram: auth.users connects one-to-one to profiles and one-to-many to securities, funds, fund_holdings, investments, investment_syncs, stock_trades, and stock_analysis. Funds and securities both feed fund_holdings and investments. Investments feed investment_syncs. Stock trades and stock analysis hang off auth.users alone, with no other relationships.](./images/er-diagram.png)
 
 This is a rendered image, not a live Mermaid block, so it always displays the same way regardless of your editor's Mermaid support.
+
+`STOCK-TRADES` and `STOCK-ANALYSIS` connect only to `AUTH-USERS`. That isolation is deliberate, not an
+oversight: a closed trade is not a holding, so nothing in those two tables reaches the dashboard,
+market, exposure, or overlap screens.
 
 In the diagram, `PROFILES.id` is also the FK to `AUTH-USERS`. Columns named `type` in SQL are shown as `fund_type` and `investment_type` because Mermaid treats `type` as a reserved word. Use the field tables below for the exact Postgres names.
 
@@ -31,6 +38,8 @@ erDiagram
     AUTH-USERS ||--o{ FUND-HOLDINGS : "owns"
     AUTH-USERS ||--o{ INVESTMENTS : "owns"
     AUTH-USERS ||--o{ INVESTMENT-SYNCS : "owns"
+    AUTH-USERS ||--o{ STOCK-TRADES : "owns"
+    AUTH-USERS ||--o{ STOCK-ANALYSIS : "owns"
     FUNDS ||--o{ FUND-HOLDINGS : "contains"
     SECURITIES ||--o{ FUND-HOLDINGS : "appears in"
     FUNDS ||--o{ INVESTMENTS : "backs"
@@ -93,6 +102,28 @@ erDiagram
         int records_processed
         string error_message
     }
+    STOCK-TRADES {
+        string id PK
+        uuid user_id FK
+        string name
+        string symbol
+        date buy_date
+        float buy_price
+        float quantity
+        date sell_date
+        float sell_price
+        datetime created_at
+    }
+    STOCK-ANALYSIS {
+        string id PK
+        uuid user_id FK
+        string name
+        string symbol
+        date buy_date
+        float buy_price
+        float target_return_percentage
+        datetime created_at
+    }
 ```
 
 To regenerate `images/er-diagram.png` after a schema change, run (no local install needed — it calls the public [mermaid.ink](https://mermaid.ink) renderer):
@@ -117,8 +148,10 @@ Save the Mermaid block above to `path/to/diagram.mmd` first (without the surroun
 | A **direct stock**       | One `investments` row (`type = stock`) and one `securities` row. `security_id` points at that company. `fund_id` is empty. |
 | A **mutual fund or ETF** | One `investments` row and one `funds` row (reused if you already used the same fund URL). `fund_id` is set.                |
 | **Sync holdings**        | New `securities` for each company name, `fund_holdings` rows (weight %), and an `investment_syncs` history row.            |
+| A **trade**              | One `stock_trades` row. Nothing else — it does not create a security, a fund, or an investment.                            |
+| An **analysis entry**    | One `stock_analysis` row, equally self-contained.                                                                          |
 
-Deleting the account calls `delete_own_account()`: syncs → holdings → investments → funds → securities → profile → `auth.users`. Other accounts are not touched.
+Deleting the account calls `delete_own_account()`: analysis → trades → syncs → holdings → investments → funds → securities → profile → `auth.users`. Other accounts are not touched.
 
 ---
 
@@ -247,6 +280,46 @@ One row per sync attempt on a fund/ETF investment. The investment detail page li
 
 ---
 
+## `stock_trades`
+
+A trade journal, separate from the portfolio book above. One row per buy; the sale columns stay empty until the position is closed. Amounts are INR.
+
+| Field        | Type                    | Purpose                                                                                                       |
+| ------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `id`         | `text` PK               | Default `gen_random_uuid()`.                                                                                  |
+| `user_id`    | `uuid` → `auth.users`   | Tenant. The only relationship this table has.                                                                 |
+| `name`       | `text` (1–120)          | Company name as typed.                                                                                        |
+| `symbol`     | `text` (1–20)           | Exchange symbol, uppercased on write so the same company groups together.                                     |
+| `buy_date`   | `date`                  | Purchase date. Start of the holding duration.                                                                 |
+| `buy_price`  | `numeric` > 0           | Price per share paid. With quantity, gives Total Pur Amt.                                                     |
+| `quantity`   | `numeric` > 0           | Shares bought. Numeric, not integer, so fractional lots work.                                                 |
+| `sell_date`  | `date`, nullable        | Sale date, or empty while open. End of the holding duration.                                                  |
+| `sell_price` | `numeric` ≥ 0, nullable | Price per share received, or empty while open. Constrained to be set or empty together with `sell_date`.      |
+| `created_at` | `timestamptz`           | Row creation. Tie-breaks trades bought on the same day.                                                       |
+
+Total Pur Amt, Total Sold Amt, Return Amt, Return and Duration are all derived at read time by `tradeMetrics` in `src/lib/finance/trades.ts`, never stored.
+
+---
+
+## `stock_analysis`
+
+A watchlist of price targets, equally self-contained. Amounts are INR.
+
+| Field                      | Type                  | Purpose                                                         |
+| -------------------------- | --------------------- | ----------------------------------------------------------------- |
+| `id`                       | `text` PK             | Default `gen_random_uuid()`.                                    |
+| `user_id`                  | `uuid` → `auth.users` | Tenant. The only relationship this table has.                   |
+| `name`                     | `text` (1–120)        | Company name as typed.                                          |
+| `symbol`                   | `text` (1–20)         | Exchange symbol, uppercased on write.                           |
+| `buy_date`                 | `date`                | Date the entry price was taken.                                 |
+| `buy_price`                | `numeric` > 0         | Entry price per share. The base the target is calculated from.  |
+| `target_return_percentage` | `numeric` > 0         | Return being aimed for.                                         |
+| `created_at`               | `timestamptz`         | Row creation. List order, newest first.                         |
+
+Target Price is `buy_price × (1 + target_return_percentage / 100)`, computed by `targetPrice()` at read time.
+
+---
+
 ## Relationships (cardinality)
 
 | From          | To                                      | Rule                                                                                    |
@@ -258,6 +331,7 @@ One row per sync attempt on a fund/ETF investment. The investment detail page li
 | `funds`       | `investments`                           | Optional. Several lots can share one fund (same URL).                                   |
 | `securities`  | `investments`                           | Optional. Direct stock only.                                                            |
 | `investments` | `investment_syncs`                      | One lot, many attempts. Syncs cascade when the lot is deleted.                          |
+| `auth.users`  | `stock_trades`, `stock_analysis`        | Many. Neither table joins to anything else, by design.                                  |
 
 ---
 
@@ -273,5 +347,7 @@ One row per sync attempt on a fund/ETF investment. The investment detail page li
 | `currency` on any table               | A function of `country` (`IN → INR`, `US → USD`). Derived once in `currencyForCountry`.   |
 | Per-holding `holding_date`            | Every row in a snapshot shares one date, already on `funds.latest_portfolio_date`.        |
 | `funds.last_scraped_at`               | Duplicated `investments.last_synced_at`, which is the one the UI actually shows.          |
+| Trade totals, return, duration        | All derivable from price, quantity, and the two dates. Computed in `finance/trades.ts`.   |
+| `stock_analysis` target price         | `buy_price × (1 + target_return_percentage / 100)`. Storing it would let the two drift.   |
 
 See [SCHEMA_GUIDE.md](./SCHEMA_GUIDE.md) for the column-by-column mapping to features, writers, readers, and how to verify each one.

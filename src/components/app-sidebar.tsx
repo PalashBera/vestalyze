@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ArrowLeftRightIcon,
   ChartPieIcon,
   LandmarkIcon,
   LayersIcon,
@@ -10,6 +11,7 @@ import {
   LogOutIcon,
   SettingsIcon,
   TableIcon,
+  TargetIcon,
   WalletIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,14 +39,31 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-const links = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
-  { href: "/investments", label: "Investments", icon: WalletIcon },
-  { href: "/exposure", label: "Stock Exposure", icon: LayersIcon },
-  { href: "/india", label: "India Market", icon: LandmarkIcon },
-  { href: "/us", label: "US Market", icon: ChartPieIcon },
-  { href: "/overlap", label: "Fund Overlap", icon: TableIcon },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
+// Trading is its own group because those pages are a journal and a watchlist.
+// They deliberately do not feed the portfolio numbers above them.
+const groups = [
+  {
+    label: "Portfolio",
+    links: [
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
+      { href: "/investments", label: "Investments", icon: WalletIcon },
+      { href: "/exposure", label: "Stock Exposure", icon: LayersIcon },
+      { href: "/india", label: "India Market", icon: LandmarkIcon },
+      { href: "/us", label: "US Market", icon: ChartPieIcon },
+      { href: "/overlap", label: "Fund Overlap", icon: TableIcon },
+    ],
+  },
+  {
+    label: "Trading",
+    links: [
+      { href: "/trades", label: "Stock Trades", icon: ArrowLeftRightIcon },
+      { href: "/analysis", label: "Stock Analysis", icon: TargetIcon },
+    ],
+  },
+  {
+    label: "Account",
+    links: [{ href: "/settings", label: "Settings", icon: SettingsIcon }],
+  },
 ];
 
 export function AppSidebar() {
@@ -65,25 +84,27 @@ export function AppSidebar() {
         <SidebarBrand />
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Portfolio</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {links.map((link) => (
-                <SidebarMenuItem key={link.href}>
-                  <SidebarMenuButton
-                    isActive={pathname === link.href}
-                    render={<Link href={link.href} />}
-                    tooltip={link.label}
-                  >
-                    <link.icon />
-                    <span>{link.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {groups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.links.map((link) => (
+                  <SidebarMenuItem key={link.href}>
+                    <SidebarMenuButton
+                      isActive={pathname === link.href}
+                      render={<Link href={link.href} />}
+                      tooltip={link.label}
+                    >
+                      <link.icon />
+                      <span>{link.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter>
         <div className="flex items-center gap-2 px-2 py-1">

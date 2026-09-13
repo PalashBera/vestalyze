@@ -1,4 +1,12 @@
-import type { Fund, FundHolding, Investment, Security, User } from "@/lib/api/types";
+import type {
+  Fund,
+  FundHolding,
+  Investment,
+  Security,
+  StockAnalysis,
+  StockTrade,
+  User,
+} from "@/lib/api/types";
 import { currencyForCountry } from "@/lib/finance/currency";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -78,6 +86,34 @@ export function mapSync(row: Tables["investment_syncs"]["Row"]): import("@/lib/a
     status: row.status,
     recordsProcessed: row.records_processed,
     errorMessage: row.error_message ?? undefined,
+  };
+}
+
+export function mapTrade(row: Tables["stock_trades"]["Row"]): StockTrade {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    symbol: row.symbol,
+    buyDate: row.buy_date,
+    buyPrice: Number(row.buy_price),
+    quantity: Number(row.quantity),
+    sellDate: row.sell_date ?? undefined,
+    sellPrice: row.sell_price === null ? undefined : Number(row.sell_price),
+    createdAt: row.created_at,
+  };
+}
+
+export function mapAnalysis(row: Tables["stock_analysis"]["Row"]): StockAnalysis {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    symbol: row.symbol,
+    buyDate: row.buy_date,
+    buyPrice: Number(row.buy_price),
+    targetReturnPercentage: Number(row.target_return_percentage),
+    createdAt: row.created_at,
   };
 }
 

@@ -174,6 +174,63 @@ export interface UpdateInvestmentRequest {
   sourceUrl?: string;
 }
 
+/**
+ * A stock trade. Amounts are in INR. `sellDate` and `sellPrice` are absent
+ * together while the trade is still open.
+ */
+export interface StockTrade {
+  id: string;
+  userId: string;
+  name: string;
+  symbol: string;
+  buyDate: string;
+  buyPrice: number;
+  quantity: number;
+  sellDate?: string;
+  sellPrice?: number;
+  createdAt: string;
+}
+
+/** Everything derived from a trade. Computed on read, never stored. */
+export interface StockTradeMetrics {
+  totalPurchaseAmount: number;
+  totalSoldAmount?: number;
+  returnAmount?: number;
+  returnPercentage?: number;
+  durationDays: number;
+  isOpen: boolean;
+}
+
+export interface CreateStockTradeRequest {
+  name: string;
+  symbol: string;
+  buyDate: string;
+  buyPrice: number;
+  quantity: number;
+  sellDate?: string | null;
+  sellPrice?: number | null;
+}
+
+/** A price target being tracked. Amounts are in INR. */
+export interface StockAnalysis {
+  id: string;
+  userId: string;
+  name: string;
+  symbol: string;
+  buyDate: string;
+  buyPrice: number;
+  targetReturnPercentage: number;
+  createdAt: string;
+}
+
+export interface CreateStockAnalysisRequest {
+  name: string;
+  symbol: string;
+  buyDate: string;
+  buyPrice: number;
+  targetReturnPercentage: number;
+}
+
 export interface ApiError {
   error: string;
   code?: string;
