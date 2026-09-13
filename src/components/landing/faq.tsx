@@ -25,7 +25,7 @@ const faqs = [
     value: "data",
     question: "Do you preload a sample portfolio?",
     answer:
-      "Never. Empty pages show a blurred preview so you can see the layout, and the sample numbers on this page are illustrative only. Your account shows real figures the moment you add your first holding, and not before.",
+      "Never. A new account is genuinely empty, and the sample numbers on this page are illustrative only. Your account shows real figures the moment you add your first holding, and nothing before that.",
   },
   {
     value: "markets",

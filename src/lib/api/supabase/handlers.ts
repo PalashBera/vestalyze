@@ -135,7 +135,6 @@ async function ensureSupabaseFund(
     name: string;
     type: "mutual_fund" | "etf";
     country: "IN" | "US";
-    currency: "INR" | "USD";
     sourceUrl: string;
   },
 ) {
@@ -158,10 +157,8 @@ async function ensureSupabaseFund(
       name: input.name,
       type: input.type,
       country: input.country,
-      currency: input.currency,
       latest_portfolio_date: now.slice(0, 10),
       source_url: input.sourceUrl,
-      last_scraped_at: now,
     })
     .select("*")
     .single();
@@ -251,8 +248,8 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
   if (!["mutual_fund", "etf", "stock"].includes(input.type)) {
     throwQueryError("Invalid investment type.", 400);
   }
-  if (!["IN", "US"].includes(input.country) || !["INR", "USD"].includes(input.currency)) {
-    throwQueryError("Invalid country or currency.", 400);
+  if (!["IN", "US"].includes(input.country)) {
+    throwQueryError("Invalid country.", 400);
   }
   if (!Number.isFinite(input.investedAmount) || input.investedAmount <= 0) {
     throwQueryError("Invested amount must be greater than zero.", 400);
@@ -282,7 +279,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
         name: input.name.trim(),
         type: input.type,
         country: input.country,
-        currency: input.currency,
         sourceUrl,
       })
     ).id;
@@ -305,7 +301,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
         standardized_name: security.standardizedName,
         ticker: security.ticker,
         country: security.country,
-        currency: security.currency,
       });
       if (securityError) {
         throwQueryError("Unable to save the stock details.", 400);
@@ -331,7 +326,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
       name: input.name.trim(),
       type: input.type,
       country: input.country,
-      currency: input.currency,
       invested_amount: input.investedAmount,
       source_url: sourceUrl || null,
     })
@@ -377,7 +371,6 @@ export async function supabaseUpdateInvestment(
           name: patch.name ?? current.investment.name,
           type: current.investment.type,
           country: current.investment.country,
-          currency: current.investment.currency,
           sourceUrl,
         })
       ).id;
@@ -430,7 +423,6 @@ export async function supabaseSyncInvestment(userId: string, id: string) {
       name: investment.name,
       type: investment.type,
       country: investment.country,
-      currency: investment.currency,
       sourceUrl,
     });
 
@@ -454,7 +446,6 @@ export async function supabaseSyncInvestment(userId: string, id: string) {
           standardized_name: security.standardizedName,
           ticker: security.ticker,
           country: security.country,
-          currency: security.currency,
         });
         if (securityError) {
           throwQueryError("Unable to save a holding company.", 400);
@@ -466,7 +457,6 @@ export async function supabaseSyncInvestment(userId: string, id: string) {
         fund_id: fund.id,
         security_id: securityId,
         allocation_percentage: item.allocationPercentage,
-        holding_date: scraped.holdingDate,
       });
     }
 
@@ -481,7 +471,6 @@ export async function supabaseSyncInvestment(userId: string, id: string) {
     await supabase
       .from("funds")
       .update({
-        last_scraped_at: completedAt,
         latest_portfolio_date: scraped.holdingDate,
         source_url: sourceUrl,
       })
@@ -574,29 +563,6 @@ export async function supabaseGetFund(userId: string, id: string) {
         ...item,
         security: securities.find((security) => security.id === item.securityId),
       })),
-  };
-}
-
-export async function supabaseRefreshFund(userId: string, id: string) {
-  const supabase = await client();
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("funds")
-    .update({ last_scraped_at: now })
-    .eq("id", id)
-    .eq("user_id", userId)
-    .select("id")
-    .maybeSingle();
-  if (error || !data) {
-    throwQueryError("Fund not found", 404);
-  }
-  const { holdings } = await catalog(userId);
-  return {
-    fundId: id,
-    status: "success" as const,
-    recordsProcessed: holdings.filter((item) => item.fundId === id).length,
-    lastScrapedAt: now,
-    message: "Holdings refresh recorded. Connect a scraper job to replace this stub.",
   };
 }
 

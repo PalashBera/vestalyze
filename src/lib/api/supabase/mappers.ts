@@ -1,4 +1,5 @@
 import type { Fund, FundHolding, Investment, Security, User } from "@/lib/api/types";
+import { currencyForCountry } from "@/lib/finance/currency";
 import type { Database } from "@/lib/supabase/database.types";
 
 type Tables = Database["public"]["Tables"];
@@ -10,7 +11,7 @@ export function mapSecurity(row: Tables["securities"]["Row"]): Security {
     standardizedName: row.standardized_name,
     ticker: row.ticker,
     country: row.country,
-    currency: row.currency,
+    currency: currencyForCountry(row.country),
   };
 }
 
@@ -21,10 +22,9 @@ export function mapFund(row: Tables["funds"]["Row"]): Fund {
     name: row.name,
     type: row.type,
     country: row.country,
-    currency: row.currency,
+    currency: currencyForCountry(row.country),
     latestPortfolioDate: row.latest_portfolio_date,
     sourceUrl: row.source_url,
-    lastScrapedAt: row.last_scraped_at,
   };
 }
 
@@ -35,7 +35,6 @@ export function mapHolding(row: Tables["fund_holdings"]["Row"]): FundHolding {
     fundId: row.fund_id,
     securityId: row.security_id,
     allocationPercentage: Number(row.allocation_percentage),
-    holdingDate: row.holding_date,
   };
 }
 
@@ -48,7 +47,7 @@ export function mapInvestment(row: Tables["investments"]["Row"]): Investment {
     name: row.name,
     type: row.type,
     country: row.country,
-    currency: row.currency,
+    currency: currencyForCountry(row.country),
     investedAmount: Number(row.invested_amount),
     sourceUrl: row.source_url ?? undefined,
     lastSyncedAt: row.last_synced_at ?? undefined,

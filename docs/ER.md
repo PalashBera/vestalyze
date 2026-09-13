@@ -54,7 +54,6 @@ erDiagram
         string standardized_name
         string ticker
         string country
-        string currency
     }
     FUNDS {
         string id PK
@@ -62,10 +61,8 @@ erDiagram
         string name
         string fund_type
         string country
-        string currency
         date latest_portfolio_date
         string source_url
-        datetime last_scraped_at
     }
     FUND-HOLDINGS {
         string id PK
@@ -73,7 +70,6 @@ erDiagram
         string fund_id FK
         string security_id FK
         float allocation_percentage
-        date holding_date
     }
     INVESTMENTS {
         string id PK
@@ -83,7 +79,6 @@ erDiagram
         string name
         string investment_type
         string country
-        string currency
         float invested_amount
         string source_url
         datetime last_synced_at
@@ -132,7 +127,7 @@ Deleting the account calls `delete_own_account()`: syncs → holdings → invest
 | Type              | Values                         | Why                                                                                   |
 | ----------------- | ------------------------------ | ------------------------------------------------------------------------------------- |
 | `country_code`    | `IN`, `US`                     | Markets the product supports. Drives India vs US views and which currency a row uses. |
-| `currency_code`   | `INR`, `USD`                   | Native currency of a position. `IN` → `INR`, `US` → `USD`.                            |
+| `currency_code`   | `INR`, `USD`                   | Only used by `profiles.display_currency`. Position currency is derived from country.  |
 | `investment_type` | `mutual_fund`, `etf`, `stock`  | What the user bought. Stocks do not sync a fund URL.                                  |
 | `fund_type`       | `mutual_fund`, `etf`           | Same as investment type minus stock. A fund catalog row is never a direct stock.      |
 | `scrape_status`   | `success`, `failed`, `running` | One sync attempt on the investment detail page.                                       |
@@ -178,10 +173,9 @@ Per-user company master. Direct stocks the user enters and companies scraped fro
 | `user_id`           | `uuid` → `auth.users` | Tenant. RLS: only the owner reads or writes.                                                                                                                       |
 | `standardized_name` | `text`                | Label in exposure tables and company drill-down (“HDFC Bank”, “Apple”).                                                                                            |
 | `ticker`            | `text`                | Dedup key. For a typed stock this is the stock code (`HDFCBANK`). For a scraped holding it is a slug from the company name. Not shown as a column on most screens. |
-| `country`           | `IN` \| `US`          | Which market book this name belongs to. Part of uniqueness.                                                                                                        |
-| `currency`          | `INR` \| `USD`        | Native currency implied by country. Kept on the row so exposure math does not re-derive it.                                                                        |
+| `country`           | `IN` \| `US`          | Which market book this name belongs to. Part of uniqueness, and the input to the derived currency.                                                                 |
 
-Category / sector is not stored. Weight and market split come from investments + holdings, not from a sector field.
+Category / sector is not stored. Weight and market split come from investments + holdings, not from a sector field. Currency is not stored either: it is `IN → INR`, `US → USD`, derived in `currencyForCountry`.
 
 ---
 
@@ -195,17 +189,15 @@ A mutual fund or ETF **source** for this user: name, market, and the public URL 
 | `user_id`               | `uuid` → `auth.users`  | Tenant.                                                                                                                         |
 | `name`                  | `text`                 | Fund or ETF name (usually copied from the investment).                                                                          |
 | `type`                  | `mutual_fund` \| `etf` | Product kind. Never `stock`.                                                                                                    |
-| `country`               | `IN` \| `US`           | Market of the product.                                                                                                          |
-| `currency`              | `INR` \| `USD`         | Native currency of the product.                                                                                                 |
+| `country`               | `IN` \| `US`           | Market of the product. Also the input to the derived currency.                                                                  |
 | `latest_portfolio_date` | `date`                 | As-of date from the last successful scrape (holding date on the page). Shown next to “Underlying holdings”.                     |
 | `source_url`            | `text`                 | Public factsheet / INDmoney URL. Unique per user when non-empty so a second investment with the same URL attaches to this fund. |
-| `last_scraped_at`       | `timestamptz`          | When holdings were last written for this fund.                                                                                  |
 
 ---
 
 ## `fund_holdings`
 
-The look-through book: each row is “this fund has X% in that company as of this date.” Sync deletes the previous rows for that fund and inserts a fresh set.
+The look-through book: each row is “this fund has X% in that company.” Sync deletes the previous rows for that fund and inserts a fresh set, so this is always the latest snapshot and never a history. The as-of date lives once on `funds.latest_portfolio_date` rather than being repeated on every holding.
 
 | Field                   | Type                  | Purpose                                                                                                                     |
 | ----------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -214,7 +206,8 @@ The look-through book: each row is “this fund has X% in that company as of thi
 | `fund_id`               | `text` → `funds`      | Which product this weight belongs to. Cascade-deleted with the fund.                                                        |
 | `security_id`           | `text` → `securities` | Which company. Combined across funds on the exposure pages.                                                                 |
 | `allocation_percentage` | `numeric(8,4)` 0–100  | Weight in the fund. `invested_amount × weight / 100` is the user’s rupee/dollar exposure to that name through this product. |
-| `holding_date`          | `date`                | Portfolio date of this snapshot. Unique with fund + security so one name appears once per scrape date.                      |
+
+Unique on `(fund_id, security_id)`: one company appears at most once per fund.
 
 ---
 
@@ -230,8 +223,7 @@ A lot the user actually holds: how much they put in, what kind of product, and (
 | `security_id`     | `text` → `securities`, nullable   | Set for a direct stock. Empty for a fund/ETF (companies live on `fund_holdings` instead).                             |
 | `name`            | `text` (1–120)                    | What the user typed (fund name or company name). List and detail title.                                               |
 | `type`            | `mutual_fund` \| `etf` \| `stock` | Controls whether Fund URL + Sync are shown.                                                                           |
-| `country`         | `IN` \| `US`                      | Market of this lot.                                                                                                   |
-| `currency`        | `INR` \| `USD`                    | Currency of `invested_amount`.                                                                                        |
+| `country`         | `IN` \| `US`                      | Market of this lot. Also the input to the derived currency of `invested_amount`.                                      |
 | `invested_amount` | `numeric` > 0                     | Money invested in this lot. For a stock this is 100% of that company. For a fund it is spread across `fund_holdings`. |
 | `source_url`      | `text`, nullable                  | Fund URL on the investment (may match `funds.source_url`). Required to sync. Unused for stocks.                       |
 | `last_synced_at`  | `timestamptz`, nullable           | Last successful holdings sync. Shown as “Last sync”. Empty for stocks.                                                |
@@ -278,3 +270,8 @@ One row per sync attempt on a fund/ETF investment. The investment detail page li
 | Units / quantity                      | Invested amount plus allocation % is the look-through input.                              |
 | Shared global security master         | Each account has its own `securities` so one user’s scrape never leaks into another book. |
 | Precomputed exposure                  | Recalculated on read so a new lot or sync is always reflected.                            |
+| `currency` on any table               | A function of `country` (`IN → INR`, `US → USD`). Derived once in `currencyForCountry`.   |
+| Per-holding `holding_date`            | Every row in a snapshot shares one date, already on `funds.latest_portfolio_date`.        |
+| `funds.last_scraped_at`               | Duplicated `investments.last_synced_at`, which is the one the UI actually shows.          |
+
+See [SCHEMA_GUIDE.md](./SCHEMA_GUIDE.md) for the column-by-column mapping to features, writers, readers, and how to verify each one.

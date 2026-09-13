@@ -1,10 +1,11 @@
 "use client";
 
+import { TableIcon } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/page-loader";
-import { PlaceholderPreview } from "@/components/placeholder-preview";
 import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
 import {
   Table,
@@ -17,7 +18,6 @@ import {
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import { formatPercent } from "@/lib/format";
-import { placeholderOverlaps } from "@/lib/placeholder/portfolio";
 
 function OverlapHoldings({
   items,
@@ -85,23 +85,13 @@ export default function OverlapPage() {
         description="Shared underlying stocks between the mutual funds and ETFs you hold."
       />
       {data.overlaps.length === 0 ? (
-        <PlaceholderPreview description="Add at least two funds or ETFs with shared holdings to see overlap. Sample pairs below.">
-          <div className="flex flex-col gap-4">
-            {placeholderOverlaps.map((overlap) => (
-              <Card key={`${overlap.fundAId}-${overlap.fundBId}`}>
-                <CardHeader>
-                  <CardTitle>
-                    {overlap.fundAName} × {overlap.fundBName}
-                  </CardTitle>
-                  <CardDescription>Overlap score {formatPercent(overlap.overlapScore)}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <OverlapHoldings items={overlap.overlappingSecurities} />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </PlaceholderPreview>
+        <EmptyState
+          icon={TableIcon}
+          title="No overlap to show"
+          description="Add at least two funds or ETFs and sync them. Any companies they both hold will appear here."
+          href="/investments"
+          actionLabel="Open investments"
+        />
       ) : null}
       {data.overlaps.map((overlap) => (
         <Card key={`${overlap.fundAId}-${overlap.fundBId}`}>

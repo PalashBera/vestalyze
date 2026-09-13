@@ -1,4 +1,5 @@
-import type { Country, CreateInvestmentRequest, Currency, Security } from "@/lib/api/types";
+import type { Country, CreateInvestmentRequest, Security } from "@/lib/api/types";
+import { currencyForCountry } from "@/lib/finance/currency";
 
 export function normalizeTicker(ticker: string): string {
   return ticker.trim().toUpperCase().replace(/[^A-Z0-9.]/g, "");
@@ -22,7 +23,7 @@ export function buildSecurityFromCompany(userId: string, name: string, country: 
     standardizedName: name.trim(),
     ticker: slug.toUpperCase(),
     country,
-    currency: (country === "IN" ? "INR" : "USD") as Currency,
+    currency: currencyForCountry(country),
   };
 }
 
@@ -40,6 +41,6 @@ export function buildSecurityFromInput(input: CreateInvestmentRequest, userId: s
     standardizedName: input.name.trim(),
     ticker,
     country: input.country,
-    currency: (input.country === "IN" ? "INR" : "USD") as Currency,
+    currency: currencyForCountry(input.country),
   };
 }

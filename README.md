@@ -4,7 +4,7 @@ Personal look-through investing for Indian mutual funds, ETFs, and US stocks. Ve
 
 The UI talks only to Next.js `/api/v1`. The BFF stores auth and holdings in **Supabase**.
 
-See [docs/SUPABASE.md](docs/SUPABASE.md) for Auth, schema, and RLS. See [docs/ER.md](docs/ER.md) for the table diagram and field purposes. See [docs/VERCEL.md](docs/VERCEL.md) to deploy on Vercel and which environment variables to set.
+See [docs/SUPABASE.md](docs/SUPABASE.md) for Auth, schema, and RLS. See [docs/ER.md](docs/ER.md) for the table diagram and field purposes, and [docs/SCHEMA_GUIDE.md](docs/SCHEMA_GUIDE.md) for what every column is for and how to verify it. See [docs/VERCEL.md](docs/VERCEL.md) to deploy on Vercel and which environment variables to set.
 
 ## Stack
 
@@ -70,6 +70,7 @@ supabase/schema.sql          Tables and owner-only RLS
 supabase/seed.sql            Notes only; FX defaults live on profiles
 docs/SUPABASE.md             Supabase setup
 docs/ER.md                   Data model and ER diagram
+docs/SCHEMA_GUIDE.md         Per-column feature map and verification queries
 docs/VERCEL.md               Vercel deploy
 ```
 

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { WalletIcon } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { InvestmentForm, SyncInvestmentButton } from "@/components/investment-form";
 import { PageHeader } from "@/components/page-header";
 import { useSettings } from "@/components/settings-provider";
@@ -9,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageLoader } from "@/components/page-loader";
-import { PlaceholderPreview } from "@/components/placeholder-preview";
 import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
 import {
   Table,
@@ -22,7 +23,6 @@ import {
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import { countryLabel, formatTimestamp, typeLabel } from "@/lib/format";
-import { placeholderInvestments } from "@/lib/placeholder/portfolio";
 
 export default function InvestmentsPage() {
   const { moneyNative } = useSettings();
@@ -49,49 +49,12 @@ export default function InvestmentsPage() {
         actions={<InvestmentForm onSaved={() => void reload()} />}
       />
       {data.investments.length === 0 ? (
-        <PlaceholderPreview description="Add a fund, ETF, or stock — nothing is preloaded. This is how your book will look.">
-          <Card>
-            <CardContent className="pt-6">
-              <RecordList>
-                {placeholderInvestments.map((item) => (
-                  <RecordListItem
-                    key={item.id}
-                    title={item.name}
-                    subtitle={`${typeLabel(item.type)} · ${countryLabel(item.country)}`}
-                    fields={[
-                      { label: "Invested", value: item.invested },
-                      { label: "Last sync", value: item.lastSync },
-                    ]}
-                  />
-                ))}
-              </RecordList>
-              <DesktopTable>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Investment</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead className="text-right">Invested</TableHead>
-                    <TableHead>Last sync</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {placeholderInvestments.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell>{typeLabel(item.type)}</TableCell>
-                      <TableCell>{countryLabel(item.country)}</TableCell>
-                      <TableCell className="text-right">{item.invested}</TableCell>
-                      <TableCell>{item.lastSync}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              </DesktopTable>
-            </CardContent>
-          </Card>
-        </PlaceholderPreview>
+        <EmptyState
+          icon={WalletIcon}
+          title="No investments yet"
+          description="Add a mutual fund, ETF, or stock to start building your book."
+          action={<InvestmentForm onSaved={() => void reload()} />}
+        />
       ) : (
         <Card>
           <CardContent className="pt-6">

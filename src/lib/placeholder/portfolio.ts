@@ -1,5 +1,7 @@
-import type { FundOverlap, Investment, PortfolioOverview, StockExposure } from "@/lib/api/types";
-import { getFxRate } from "@/lib/finance/currency";
+// Illustrative numbers for the marketing pages only. Signed-in screens render
+// real data or an empty state, never these.
+import type { FundOverlap, Investment, StockExposure } from "@/lib/api/types";
+import { currencyForCountry } from "@/lib/finance/currency";
 
 function demoSecurity(
   id: string,
@@ -9,11 +11,11 @@ function demoSecurity(
 ): StockExposure["security"] {
   return {
     id,
-    userId: "preview",
+    userId: "demo",
     standardizedName: name,
     ticker,
     country,
-    currency: country === "IN" ? "INR" : "USD",
+    currency: currencyForCountry(country),
   };
 }
 
@@ -128,42 +130,6 @@ export const placeholderExposures: StockExposure[] = [
     portfolioPercentage: 3.6,
     breakdown: [],
   },
-];
-
-export const placeholderOverview: PortfolioOverview = {
-  totalInvestedInr: 1205000,
-  indiaInvestedInr: 720000,
-  usInvestedInr: 485000,
-  mutualFundInvestedInr: 510000,
-  etfInvestedInr: 380000,
-  stockInvestedInr: 315000,
-  fxRate: getFxRate(),
-  marketAllocation: [
-    { key: "IN", label: "India", amountInr: 720000, amountUsd: 8250, percentage: 59.8 },
-    { key: "US", label: "United States", amountInr: 485000, amountUsd: 5560, percentage: 40.2 },
-  ],
-  typeAllocation: [
-    { key: "mutual_fund", label: "Mutual Funds", amountInr: 510000, amountUsd: 5845, percentage: 42.3 },
-    { key: "etf", label: "ETFs", amountInr: 380000, amountUsd: 4355, percentage: 31.5 },
-    { key: "stock", label: "Direct Stocks", amountInr: 315000, amountUsd: 3610, percentage: 26.2 },
-  ],
-  topHoldings: placeholderExposures,
-};
-
-export const placeholderHoldings = [
-  { id: "ph-1", name: "HDFC Bank", allocationPercentage: 8.4 },
-  { id: "ph-2", name: "Reliance Industries", allocationPercentage: 6.1 },
-  { id: "ph-3", name: "Infosys", allocationPercentage: 4.8 },
-  { id: "ph-4", name: "ICICI Bank", allocationPercentage: 3.9 },
-  { id: "ph-5", name: "TCS", allocationPercentage: 3.2 },
-  { id: "ph-6", name: "Bharti Airtel", allocationPercentage: 2.7 },
-  { id: "ph-7", name: "Larsen & Toubro", allocationPercentage: 2.4 },
-];
-
-export const placeholderSyncs = [
-  { id: "ps-1", startedAt: "2026-08-12T09:14:00.000Z", status: "success" as const, recordsProcessed: 48 },
-  { id: "ps-2", startedAt: "2026-07-03T11:02:00.000Z", status: "success" as const, recordsProcessed: 46 },
-  { id: "ps-3", startedAt: "2026-06-01T08:40:00.000Z", status: "failed" as const, recordsProcessed: 0, errorMessage: "Could not read the holdings table." },
 ];
 
 export const placeholderInvestments: Array<Pick<Investment, "id" | "name" | "type" | "country" | "currency"> & { invested: string; lastSync: string }> = [

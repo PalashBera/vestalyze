@@ -1,17 +1,17 @@
 "use client";
 
+import { LayersIcon } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { ExposureTable } from "@/components/exposure-table";
 import { PageHeader } from "@/components/page-header";
 import { PageLoader } from "@/components/page-loader";
-import { PlaceholderPreview } from "@/components/placeholder-preview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import type { StockExposure } from "@/lib/api/types";
-import { placeholderExposures } from "@/lib/placeholder/portfolio";
 
-function ExposureBody({ rows, preview = false }: { rows: StockExposure[]; preview?: boolean }) {
+function ExposureBody({ rows }: { rows: StockExposure[] }) {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -24,7 +24,7 @@ function ExposureBody({ rows, preview = false }: { rows: StockExposure[]; previe
           <CardDescription>Click a column header to sort. Open a company for the contributing funds.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ExposureTable rows={rows} disableLinks={preview} />
+          <ExposureTable rows={rows} />
         </CardContent>
       </Card>
     </div>
@@ -49,9 +49,19 @@ export default function ExposurePage() {
 
   if (data.exposures.length === 0) {
     return (
-      <PlaceholderPreview>
-        <ExposureBody rows={placeholderExposures} preview />
-      </PlaceholderPreview>
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Consolidated stock exposure"
+          description="Direct stock investments combined with look-through holdings from mutual funds and ETFs."
+        />
+        <EmptyState
+          icon={LayersIcon}
+          title="No exposure yet"
+          description="Add a holding, then sync its fund URL to see every company you own across funds, ETFs, and direct stocks."
+          href="/investments"
+          actionLabel="Open investments"
+        />
+      </div>
     );
   }
 

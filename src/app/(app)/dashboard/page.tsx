@@ -1,10 +1,11 @@
 "use client";
 
+import { LayoutDashboardIcon } from "lucide-react";
 import { AllocationChart } from "@/components/allocation-chart";
+import { EmptyState } from "@/components/empty-state";
 import { ExposureTable } from "@/components/exposure-table";
 import { PageHeader } from "@/components/page-header";
 import { PageLoader } from "@/components/page-loader";
-import { PlaceholderPreview } from "@/components/placeholder-preview";
 import { StatCard } from "@/components/stat-card";
 import { useSettings } from "@/components/settings-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,9 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import type { PortfolioOverview } from "@/lib/api/types";
-import { placeholderExposures, placeholderOverview } from "@/lib/placeholder/portfolio";
 
-function DashboardBody({ data, preview = false }: { data: PortfolioOverview; preview?: boolean }) {
+function DashboardBody({ data }: { data: PortfolioOverview }) {
   const { money } = useSettings();
   return (
     <div className="flex flex-col gap-6">
@@ -40,17 +40,15 @@ function DashboardBody({ data, preview = false }: { data: PortfolioOverview; pre
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {preview || data.topHoldings.length > 0 ? (
-            <ExposureTable rows={data.topHoldings} disableLinks={preview} />
+          {data.topHoldings.length > 0 ? (
+            <ExposureTable rows={data.topHoldings} />
           ) : (
-            <PlaceholderPreview
-              title="This is a preview"
+            <EmptyState
+              title="No company exposure yet"
               description="Sync a fund URL to fill this table with look-through company exposure."
               href="/investments"
               actionLabel="Open investments"
-            >
-              <ExposureTable rows={placeholderExposures} disableLinks />
-            </PlaceholderPreview>
+            />
           )}
         </CardContent>
       </Card>
@@ -76,9 +74,19 @@ export default function DashboardPage() {
 
   if (data.totalInvestedInr === 0) {
     return (
-      <PlaceholderPreview>
-        <DashboardBody data={placeholderOverview} preview />
-      </PlaceholderPreview>
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Portfolio overview"
+          description="Consolidated invested amount and look-through exposure across India and the US."
+        />
+        <EmptyState
+          icon={LayoutDashboardIcon}
+          title="Nothing here yet"
+          description="Add a mutual fund, ETF, or stock and your consolidated exposure will appear here."
+          href="/onboarding"
+          actionLabel="Add your first holding"
+        />
+      </div>
     );
   }
 

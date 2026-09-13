@@ -35,7 +35,6 @@ export type Database = {
           standardized_name: string;
           ticker: string;
           country: "IN" | "US";
-          currency: "INR" | "USD";
         };
         Insert: Database["public"]["Tables"]["securities"]["Row"];
         Update: Partial<Database["public"]["Tables"]["securities"]["Row"]>;
@@ -48,10 +47,8 @@ export type Database = {
           name: string;
           type: "mutual_fund" | "etf";
           country: "IN" | "US";
-          currency: "INR" | "USD";
           latest_portfolio_date: string;
           source_url: string;
-          last_scraped_at: string;
         };
         Insert: Database["public"]["Tables"]["funds"]["Row"];
         Update: Partial<Database["public"]["Tables"]["funds"]["Row"]>;
@@ -64,7 +61,6 @@ export type Database = {
           fund_id: string;
           security_id: string;
           allocation_percentage: number;
-          holding_date: string;
         };
         Insert: Database["public"]["Tables"]["fund_holdings"]["Row"];
         Update: Partial<Database["public"]["Tables"]["fund_holdings"]["Row"]>;
@@ -79,7 +75,6 @@ export type Database = {
           name: string;
           type: "mutual_fund" | "etf" | "stock";
           country: "IN" | "US";
-          currency: "INR" | "USD";
           invested_amount: number;
           source_url: string | null;
           last_synced_at: string | null;
@@ -93,7 +88,6 @@ export type Database = {
           name: string;
           type: "mutual_fund" | "etf" | "stock";
           country: "IN" | "US";
-          currency: "INR" | "USD";
           invested_amount: number;
           source_url?: string | null;
           last_synced_at?: string | null;

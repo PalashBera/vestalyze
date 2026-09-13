@@ -1,7 +1,15 @@
-import type { Currency } from "@/lib/api/types";
+import type { Country, Currency } from "@/lib/api/types";
 
 export const FX_USD_INR = 87.25;
 export const FX_AS_OF = "2026-09-04";
+
+/**
+ * Currency is a function of the listing market, which is why no table stores it.
+ * Every layer derives it here so the rule lives in exactly one place.
+ */
+export function currencyForCountry(country: Country): Currency {
+  return country === "IN" ? "INR" : "USD";
+}
 
 export function toInr(amount: number, currency: Currency, usdInr = FX_USD_INR): number {
   return currency === "INR" ? amount : amount * usdInr;

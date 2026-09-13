@@ -1,9 +1,10 @@
 "use client";
 
+import { LandmarkIcon } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { ExposureTable } from "@/components/exposure-table";
 import { PageHeader } from "@/components/page-header";
 import { PageLoader } from "@/components/page-loader";
-import { PlaceholderPreview } from "@/components/placeholder-preview";
 import { StatCard } from "@/components/stat-card";
 import { useSettings } from "@/components/settings-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -11,25 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import type { MarketDashboard } from "@/lib/api/types";
-import { placeholderExposures, placeholderOverview } from "@/lib/placeholder/portfolio";
 
-const placeholderIndia: MarketDashboard = {
-  country: "IN",
-  totalInvestedNative: placeholderOverview.indiaInvestedInr,
-  currency: "INR",
-  byType: { mutualFund: 410000, etf: 180000, stock: 130000 },
-  exposures: placeholderExposures.filter((item) => item.indiaInvestedInr > 0),
-};
-
-function IndiaBody({
-  data,
-  preview = false,
-  emptyExposure = false,
-}: {
-  data: MarketDashboard;
-  preview?: boolean;
-  emptyExposure?: boolean;
-}) {
+function IndiaBody({ data }: { data: MarketDashboard }) {
   const { moneyNative } = useSettings();
   return (
     <div className="flex flex-col gap-6">
@@ -49,17 +33,15 @@ function IndiaBody({
           <CardDescription>Same company combined across funds, ETFs, and direct holdings.</CardDescription>
         </CardHeader>
         <CardContent>
-          {emptyExposure ? (
-            <PlaceholderPreview
+          {data.exposures.length > 0 ? (
+            <ExposureTable rows={data.exposures} variant="india" />
+          ) : (
+            <EmptyState
               title="No stock exposure yet"
               description="Sync a fund URL to unfold Indian companies behind your mutual funds and ETFs."
               href="/investments"
               actionLabel="Open investments"
-            >
-              <ExposureTable rows={placeholderIndia.exposures} variant="india" disableLinks />
-            </PlaceholderPreview>
-          ) : (
-            <ExposureTable rows={data.exposures} variant="india" disableLinks={preview} />
+            />
           )}
         </CardContent>
       </Card>
@@ -85,14 +67,20 @@ export default function IndiaPage() {
 
   if (data.totalInvestedNative === 0) {
     return (
-      <PlaceholderPreview>
-        <IndiaBody data={placeholderIndia} preview />
-      </PlaceholderPreview>
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Indian market"
+          description="Mutual funds, ETFs, and direct Indian stocks with consolidated company exposure."
+        />
+        <EmptyState
+          icon={LandmarkIcon}
+          title="No Indian holdings yet"
+          description="Add an Indian mutual fund, ETF, or stock to see your consolidated exposure for this market."
+          href="/onboarding"
+          actionLabel="Add an Indian holding"
+        />
+      </div>
     );
-  }
-
-  if (data.exposures.length === 0) {
-    return <IndiaBody data={data} emptyExposure />;
   }
 
   return <IndiaBody data={data} />;

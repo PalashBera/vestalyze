@@ -29,7 +29,6 @@ export interface Fund {
   currency: Currency;
   latestPortfolioDate: string;
   sourceUrl: string;
-  lastScrapedAt: string;
 }
 
 export interface FundHolding {
@@ -38,7 +37,6 @@ export interface FundHolding {
   fundId: string;
   securityId: string;
   allocationPercentage: number;
-  holdingDate: string;
 }
 
 export interface Investment {
@@ -163,7 +161,6 @@ export interface CreateInvestmentRequest {
   name: string;
   type: InvestmentType;
   country: Country;
-  currency: Currency;
   investedAmount: number;
   fundId?: string;
   securityId?: string;
@@ -186,10 +183,3 @@ export interface AuthResponse {
   user: User;
 }
 
-export interface RefreshResult {
-  fundId: string;
-  status: ScrapeStatus;
-  recordsProcessed: number;
-  lastScrapedAt: string;
-  message: string;
-}

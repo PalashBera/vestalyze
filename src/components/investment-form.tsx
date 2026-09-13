@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { PencilIcon, RefreshCwIcon } from "lucide-react";
 import { api } from "@/lib/api/client";
-import type { Country, CreateInvestmentRequest, Currency, Investment, InvestmentType } from "@/lib/api/types";
+import type { Country, CreateInvestmentRequest, Investment, InvestmentType } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -165,7 +165,6 @@ export function payloadFromForm(
     name: String(formData.get("name") ?? "").trim(),
     type,
     country,
-    currency: (country === "IN" ? "INR" : "USD") as Currency,
     investedAmount: Number(formData.get("investedAmount")),
     ticker: String(formData.get("ticker") ?? ""),
     sourceUrl: String(formData.get("sourceUrl") ?? "").trim() || undefined,

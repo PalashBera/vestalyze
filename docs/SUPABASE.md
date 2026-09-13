@@ -58,24 +58,35 @@ In the Supabase SQL editor, run in order:
 
 There is no sample portfolio. New users add holdings in onboarding. Company names from fund syncs and direct stocks they enter are stored in `securities` under their `user_id`.
 
-You do **not** need a new Supabase project unless you want one. To reset the current project, paste `schema.sql` in the SQL editor. To keep existing holdings and only drop unused columns, those were already removed: `securities.sector` and `investments.units`.
+You do **not** need a new Supabase project unless you want one. Pasting `schema.sql` in the SQL editor drops and recreates the app tables, then backfills a profile for any `auth.users` row that already existed, so re-running it will not strand an existing login.
 
 ---
 
 ## 4. Tables
 
-Field-by-field purpose and an ER diagram: [ER.md](./ER.md).
+Field-by-field purpose and an ER diagram: [ER.md](./ER.md). Per-column feature mapping and verification queries: [SCHEMA_GUIDE.md](./SCHEMA_GUIDE.md).
 
-| Table              | Columns that stay                                                                                                                                 | RLS                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `profiles`         | `id`, `name`, `display_currency`, `fx_usd_inr`, `fx_as_of`, `created_at`                                                                          | Own row only                        |
-| `securities`       | `id`, `user_id`, `standardized_name`, `ticker`, `country`, `currency`                                                                             | Owner CRUD (`user_id = auth.uid()`) |
-| `funds`            | `id`, `user_id`, `name`, `type`, `country`, `currency`, `latest_portfolio_date`, `source_url`, `last_scraped_at`                                  | Owner CRUD                          |
-| `fund_holdings`    | `id`, `user_id`, `fund_id`, `security_id`, `allocation_percentage`, `holding_date`                                                                | Owner CRUD                          |
-| `investments`      | `id`, `user_id`, `fund_id`, `security_id`, `name`, `type`, `country`, `currency`, `invested_amount`, `source_url`, `last_synced_at`, `created_at` | Owner CRUD                          |
-| `investment_syncs` | `id`, `user_id`, `investment_id`, `started_at`, `status`, `records_processed`, `error_message`                                                    | Owner CRUD                          |
+Every column also carries a Postgres comment, so the Supabase table editor explains each one inline.
 
-Removed: `securities.sector` (stock category) and `investments.units`. Every other column is still read or written by the API.
+| Table              | Columns                                                                                                                              | RLS                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `profiles`         | `id`, `name`, `display_currency`, `fx_usd_inr`, `fx_as_of`, `created_at`                                                             | Own row only (select + update)      |
+| `securities`       | `id`, `user_id`, `standardized_name`, `ticker`, `country`                                                                            | Owner CRUD (`user_id = auth.uid()`) |
+| `funds`            | `id`, `user_id`, `name`, `type`, `country`, `latest_portfolio_date`, `source_url`                                                     | Owner CRUD                          |
+| `fund_holdings`    | `id`, `user_id`, `fund_id`, `security_id`, `allocation_percentage`                                                                   | Owner CRUD                          |
+| `investments`      | `id`, `user_id`, `fund_id`, `security_id`, `name`, `type`, `country`, `invested_amount`, `source_url`, `last_synced_at`, `created_at` | Owner CRUD                          |
+| `investment_syncs` | `id`, `user_id`, `investment_id`, `started_at`, `status`, `records_processed`, `error_message`                                       | Owner CRUD                          |
+
+Deliberately absent, and why:
+
+| Removed                                             | Reason                                                                                     |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `currency` on securities, funds, investments        | Derived from `country` (`IN → INR`, `US → USD`) in `currencyForCountry`.                    |
+| `fund_holdings.holding_date`                        | Constant across a snapshot; the as-of date lives once on `funds.latest_portfolio_date`.     |
+| `funds.last_scraped_at`                             | Duplicated `investments.last_synced_at`, which is the value the UI shows.                   |
+| `securities.sector`, `investments.units`            | Exposure is company, market, and weight. Amount plus allocation % is the whole input.       |
+
+Every remaining column is read or written by the API. `profiles.display_currency` is the only currency column left, and it is a reporting preference rather than the currency of a position.
 
 `profiles.id` references `auth.users(id)`. A trigger `handle_new_user` inserts a profile from `raw_user_meta_data.name` on signup, with default FX `87.25`.
 
@@ -145,10 +156,10 @@ INDmoney pages may sit behind Cloudflare. If the fetch returns a challenge page,
 ## 8. Local setup
 
 1. Create the project and disable confirm-email for local testing (Authentication → Providers → Email).
-2. Run `schema.sql` then `seed.sql`.
+2. Run `schema.sql`. There is no seed data — every account starts empty.
 3. Put `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `.env.local`.
 4. Restart `npm run dev`.
-5. Register a new account and complete onboarding. Pages stay on a blurred preview until you add holdings.
+5. Register a new account and complete onboarding. Pages show an empty state until you add holdings.
 
 ---
 
@@ -161,8 +172,12 @@ Vercel steps and the exact env vars are in [VERCEL.md](./VERCEL.md).
 - Enforce HTTPS. Cookies already use `Secure` when `NODE_ENV=production`.
 - Keep the service role out of the Next.js app and CI logs.
 - Nested catalog tables already use owner-only RLS. Keep writes on the user JWT; do not bypass RLS with a service role from the app.
-- Prefer official portfolio files over HTML scraping when you replace the refresh stubs.
+- Prefer official portfolio files over HTML scraping if you extend the sync path.
 - Rotate the anon key if it is ever committed.
+- Enable leaked-password protection (Authentication → Policies). It is off by default and the Supabase advisor flags it.
+- Run the verification queries in [SCHEMA_GUIDE.md](./SCHEMA_GUIDE.md) after any schema change.
+
+The advisor also reports that `delete_own_account()` is a security-definer function callable by signed-in users. That is intentional: it is how self-service account deletion works. It derives the target from `auth.uid()` and takes no arguments, and the BFF re-checks the password before calling it.
 
 ---
 
@@ -171,7 +186,8 @@ Vercel steps and the exact env vars are in [VERCEL.md](./VERCEL.md).
 ```text
 docs/SUPABASE.md                 This guide
 docs/ER.md                       Tables, fields, ER diagram
-supabase/schema.sql              Tables, RLS, trigger, delete_own_account()
+docs/SCHEMA_GUIDE.md             Per-column feature map and verification queries
+supabase/schema.sql              Tables, comments, RLS, trigger, delete_own_account()
 supabase/seed.sql                Notes (no sample portfolio)
 supabase/functions/extract-url   Optional Edge Function for later crawl jobs
 src/lib/supabase/server.ts       Cookie SSR client

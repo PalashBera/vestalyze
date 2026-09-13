@@ -3,9 +3,9 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/empty-state";
 import { InvestmentForm, SyncInvestmentButton } from "@/components/investment-form";
 import { PageHeader } from "@/components/page-header";
-import { PlaceholderPreview } from "@/components/placeholder-preview";
 import { useSettings } from "@/components/settings-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -35,7 +35,6 @@ import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import type { Currency, ScrapeStatus } from "@/lib/api/types";
 import { countryLabel, formatPercent, formatTimestamp, titleize, typeLabel } from "@/lib/format";
-import { placeholderHoldings, placeholderSyncs } from "@/lib/placeholder/portfolio";
 import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
 
 function HoldingsTable({
@@ -255,18 +254,10 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
                 moneyNative={moneyNative}
               />
             ) : (
-              <PlaceholderPreview
+              <EmptyState
                 title="No holdings yet"
                 description="Sync this investment to scrape the stock split from the fund URL."
-                hideAction
-              >
-                <HoldingsTable
-                  rows={placeholderHoldings}
-                  investedAmount={investment.investedAmount || 100000}
-                  currency={investment.currency}
-                  moneyNative={moneyNative}
-                />
-              </PlaceholderPreview>
+              />
             )}
           </CardContent>
         </Card>
@@ -281,13 +272,10 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
             {syncs.length > 0 ? (
               <SyncHistoryTable rows={syncs} />
             ) : (
-              <PlaceholderPreview
+              <EmptyState
                 title="No syncs yet"
                 description="Sync this investment to scrape the stock split and record it here."
-                hideAction
-              >
-                <SyncHistoryTable rows={placeholderSyncs} />
-              </PlaceholderPreview>
+              />
             )}
           </CardContent>
         </Card>

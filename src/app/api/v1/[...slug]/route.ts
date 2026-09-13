@@ -22,7 +22,6 @@ import {
   supabaseMe,
   supabaseOverlap,
   supabaseOverview,
-  supabaseRefreshFund,
   supabaseRegister,
   supabaseSyncInvestment,
   supabaseUpdateFxRate,
@@ -175,11 +174,6 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
   if (fundHoldingsMatch && method === "GET") {
     const detail = await supabaseGetFund(userId, fundHoldingsMatch[1]);
     return jsonOk({ holdings: detail.holdings });
-  }
-
-  const fundRefreshMatch = path.match(/^funds\/([^/]+)\/refresh$/);
-  if (fundRefreshMatch && method === "POST") {
-    return jsonOk(await supabaseRefreshFund(userId, fundRefreshMatch[1]));
   }
 
   if (path === "securities" && method === "GET") {
