@@ -1,18 +1,24 @@
 "use client";
 
-import { CopyIcon } from "lucide-react";
+import { CopyIcon, SearchIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { copyableAmount, copyText } from "@/lib/clipboard";
+
+function googleSearchUrl(symbol: string): string {
+  return `https://www.google.com/search?${new URLSearchParams({ q: symbol }).toString()}`;
+}
 
 export function CopySymbol({
   symbol,
   badge = true,
+  search = false,
 }: {
   symbol: string;
   badge?: boolean;
+  search?: boolean;
 }) {
   async function onCopy() {
     try {
@@ -27,6 +33,7 @@ export function CopySymbol({
     <span className="inline-flex items-center gap-1">
       {badge ? <Badge variant="secondary">{symbol}</Badge> : <span>{symbol}</span>}
       <CopyButton label={`Copy ${symbol}`} hint="Copy symbol" onCopy={() => void onCopy()} />
+      {search ? <GoogleSearchLink symbol={symbol} /> : null}
     </span>
   );
 }
@@ -75,6 +82,27 @@ function CopyButton({
         <span className="sr-only">{label}</span>
       </TooltipTrigger>
       <TooltipContent>{hint}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function GoogleSearchLink({ symbol }: { symbol: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <a
+            href={googleSearchUrl(symbol)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonVariants({ variant: "ghost", size: "icon-xs" })}
+          />
+        }
+      >
+        <SearchIcon />
+        <span className="sr-only">Search {symbol} on Google</span>
+      </TooltipTrigger>
+      <TooltipContent>Search Google</TooltipContent>
     </Tooltip>
   );
 }
