@@ -142,6 +142,7 @@ export const api = {
         body: JSON.stringify(input),
       }),
     remove: (id: string) => request<{ ok: boolean }>(`/analysis/${id}`, { method: "DELETE" }),
+    emailCsv: () => request<{ ok: boolean; email: string }>("/analysis/email", { method: "POST" }),
   },
   catalog: {
     funds: () => request<{ funds: Fund[] }>("/funds"),
@@ -155,6 +156,11 @@ export const api = {
       request<UserSettings>("/settings", {
         method: "PATCH",
         body: JSON.stringify({ displayCurrency }),
+      }),
+    updateTargets: (input: { targetProfitPercentage: number; targetLossPercentage: number }) =>
+      request<UserSettings>("/settings", {
+        method: "PATCH",
+        body: JSON.stringify(input),
       }),
     fx: () => request<FxRate>("/fx/rate"),
     updateFx: (rate: number) =>

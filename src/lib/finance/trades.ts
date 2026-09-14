@@ -46,6 +46,34 @@ export function targetPrice(entry: Pick<StockAnalysis, "buyPrice" | "targetRetur
   return entry.buyPrice * (1 + entry.targetReturnPercentage / 100);
 }
 
+export function analysisIsOpen(entry: Pick<StockAnalysis, "exitedDate">): boolean {
+  return !entry.exitedDate;
+}
+
+/**
+ * How much of the analysis target return the Settings profit/loss share
+ * represents, as a fraction of the buying price. 80% of a 20% target is 0.16.
+ */
+function targetShare(targetReturnPercentage: number, sharePercentage: number): number {
+  return (sharePercentage / 100) * (targetReturnPercentage / 100);
+}
+
+/** Sell target: buying price plus that share of the row's target return. */
+export function sellTargetPrice(
+  entry: Pick<StockAnalysis, "buyPrice" | "targetReturnPercentage">,
+  profitPercentage: number,
+): number {
+  return entry.buyPrice * (1 + targetShare(entry.targetReturnPercentage, profitPercentage));
+}
+
+/** Stop loss: buying price minus that share of the row's target return. */
+export function stopLossPrice(
+  entry: Pick<StockAnalysis, "buyPrice" | "targetReturnPercentage">,
+  lossPercentage: number,
+): number {
+  return entry.buyPrice * (1 - targetShare(entry.targetReturnPercentage, lossPercentage));
+}
+
 /** Totals across the closed trades in a list. Open trades contribute nothing. */
 export function tradeTotals(trades: StockTrade[], now = new Date()) {
   return trades.reduce(

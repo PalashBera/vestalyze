@@ -11,7 +11,6 @@ import { DesktopTable, RecordList, RecordListItem } from "@/components/record-li
 import { StatCard } from "@/components/stat-card";
 import { StockTradeForm } from "@/components/stock-trade-form";
 import { TradeExportActions } from "@/components/trade-export-actions";
-import { TruncatedName } from "@/components/truncated-name";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +40,6 @@ import {
 const OPEN = "—";
 
 type SortKey =
-  | "name"
   | "symbol"
   | "buyDate"
   | "buyPrice"
@@ -82,15 +80,9 @@ function returnCell(metrics: StockTradeMetrics) {
   return metrics.returnPercentage === undefined ? OPEN : formatSignedPercent(metrics.returnPercentage);
 }
 
-function tradeLabel(trade: { name?: string; symbol: string }): string {
-  return trade.name?.trim() || trade.symbol;
-}
-
 function sortValue(trade: StockTrade, key: SortKey): string | number | null {
   const metrics = tradeMetrics(trade);
   switch (key) {
-    case "name":
-      return tradeLabel(trade).toLowerCase();
     case "symbol":
       return trade.symbol.toLowerCase();
     case "buyDate":
@@ -223,16 +215,11 @@ function TradeRows({
           return (
             <RecordListItem
               key={trade.id}
-              title={<TruncatedName name={tradeLabel(trade)} />}
-              subtitle={
-                <span className="flex items-center gap-2">
-                  <CopySymbol symbol={trade.symbol} badge={false} />
-                  {metrics.isOpen ? <Badge variant="secondary">In progress</Badge> : null}
-                </span>
-              }
+              title={<CopySymbol symbol={trade.symbol} />}
+              subtitle={metrics.isOpen ? <Badge variant="secondary">In progress</Badge> : undefined}
               actions={<TradeActions trade={trade} onSaved={onSaved} />}
               fields={[
-                { label: "Bought", value: formatDateOnly(trade.buyDate) },
+                { label: "Date", value: formatDateOnly(trade.buyDate) },
                 { label: "Buy", value: price(trade.buyPrice) },
                 { label: "Qty", value: String(trade.quantity) },
                 { label: "Sold", value: formatDateOnly(trade.sellDate) },
@@ -271,10 +258,9 @@ function TradeRows({
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableHead label="Name" column="name" active={sortKey} direction={direction} onSort={onSort} />
               <SortableHead label="Symbol" column="symbol" active={sortKey} direction={direction} onSort={onSort} />
               <SortableHead
-                label="Bought"
+                label="Date"
                 hint="Buy date"
                 column="buyDate"
                 active={sortKey}
@@ -369,9 +355,6 @@ function TradeRows({
               const metrics = tradeMetrics(trade);
               return (
                 <TableRow key={trade.id}>
-                  <TableCell className="font-medium">
-                    <TruncatedName name={tradeLabel(trade)} />
-                  </TableCell>
                   <TableCell>
                     <CopySymbol symbol={trade.symbol} />
                   </TableCell>
@@ -435,7 +418,7 @@ export default function TradesPage() {
       return;
     }
     setSortKey(column);
-    setDirection(column === "name" || column === "symbol" ? "asc" : "desc");
+    setDirection(column === "symbol" ? "asc" : "desc");
   }
 
   if (loading) {

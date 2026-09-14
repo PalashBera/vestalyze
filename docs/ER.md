@@ -55,6 +55,8 @@ erDiagram
         string display_currency
         float fx_usd_inr
         date fx_as_of
+        float target_profit_percentage
+        float target_loss_percentage
         datetime created_at
     }
     SECURITIES {
@@ -105,7 +107,6 @@ erDiagram
     STOCK-TRADES {
         string id PK
         uuid user_id FK
-        string name
         string symbol
         date buy_date
         float buy_price
@@ -117,11 +118,11 @@ erDiagram
     STOCK-ANALYSIS {
         string id PK
         uuid user_id FK
-        string name
         string symbol
         date buy_date
         float buy_price
         float target_return_percentage
+        date exited_date
         datetime created_at
     }
 ```
@@ -192,6 +193,8 @@ Inserted by the `handle_new_user` trigger on signup. The user can update name an
 | `display_currency` | `INR` \| `USD`           | How consolidated amounts are shown. Native lots stay in their own currency; totals convert with FX. |
 | `fx_usd_inr`       | `numeric` > 0            | Manual USD per INR. Default `87.25`. Used for India vs US and portfolio totals.                     |
 | `fx_as_of`         | `date`                   | Day the rate was last saved. Shown as “Last set …” in Settings.                                     |
+| `target_profit_percentage` | `numeric` (optional) | Share of each analysis row's target return for Sell Target. Buy 100, target 20%, 80% here → 116. |
+| `target_loss_percentage`   | `numeric` (optional) | Share of each analysis row's target return for Stop Loss. Same example at 80% → 84.              |
 | `created_at`       | `timestamptz`            | When the profile row was created (signup).                                                          |
 
 ---
@@ -288,7 +291,6 @@ A trade journal, separate from the portfolio book above. One row per buy; the sa
 | ------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `id`         | `text` PK               | Default `gen_random_uuid()`.                                                                                  |
 | `user_id`    | `uuid` → `auth.users`   | Tenant. The only relationship this table has.                                                                 |
-| `name`       | `text` (1–120), nullable | Optional company name. Blank when imported from a ticker-only source. The table falls back to `symbol`. |
 | `symbol`     | `text` (1–20)           | Exchange symbol, uppercased on write so the same company groups together.                                     |
 | `buy_date`   | `date`                  | Purchase date. Start of the holding duration.                                                                 |
 | `buy_price`  | `numeric` > 0           | Price per share paid. With quantity, gives Total Pur Amt.                                                     |
@@ -309,11 +311,11 @@ A watchlist of price targets, equally self-contained. Amounts are INR.
 | -------------------------- | --------------------- | ----------------------------------------------------------------- |
 | `id`                       | `text` PK             | Default `gen_random_uuid()`.                                    |
 | `user_id`                  | `uuid` → `auth.users` | Tenant. The only relationship this table has.                   |
-| `name`                     | `text` (1–120)        | Company name as typed.                                          |
 | `symbol`                   | `text` (1–20)         | Exchange symbol, uppercased on write.                           |
 | `buy_date`                 | `date`                | Date the entry price was taken.                                 |
 | `buy_price`                | `numeric` > 0         | Entry price per share. The base the target is calculated from.  |
 | `target_return_percentage` | `numeric` > 0         | Return being aimed for.                                         |
+| `exited_date`              | `date`, nullable      | When the thesis closed, or empty while in progress. Must not precede `buy_date`. |
 | `created_at`               | `timestamptz`         | Row creation. List order, newest first.                         |
 
 Target Price is `buy_price × (1 + target_return_percentage / 100)`, computed by `targetPrice()` at read time.

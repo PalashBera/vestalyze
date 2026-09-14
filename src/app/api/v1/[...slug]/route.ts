@@ -9,6 +9,7 @@ import {
   supabaseDeleteAnalysis,
   supabaseDeleteInvestment,
   supabaseDeleteTrade,
+  supabaseEmailAnalysis,
   supabaseEmailTrades,
   supabaseExposure,
   supabaseExposureDetail,
@@ -247,6 +248,13 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
     const input = await request.json();
     return jsonOk({ entry: await supabaseCreateAnalysis(userId, input) }, { status: 201 });
   }
+  if (path === "analysis/email" && method === "POST") {
+    const limit = consumeAuthAttempt(`analysis-email:${userId}`);
+    if (!limit.allowed) {
+      return jsonError("Too many emails. Try again later.", 429);
+    }
+    return jsonOk(await supabaseEmailAnalysis(userId));
+  }
   const analysisMatch = path.match(/^analysis\/([^/]+)$/);
   if (analysisMatch && method === "PATCH") {
     const input = await request.json();
@@ -260,8 +268,12 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
     return jsonOk(await supabaseGetSettings(userId));
   }
   if (path === "settings" && method === "PATCH") {
-    const body = (await request.json()) as { displayCurrency?: "INR" | "USD" };
-    return jsonOk(await supabaseUpdateSettings(userId, body.displayCurrency ?? "INR"));
+    const body = (await request.json()) as {
+      displayCurrency?: "INR" | "USD";
+      targetProfitPercentage?: number;
+      targetLossPercentage?: number;
+    };
+    return jsonOk(await supabaseUpdateSettings(userId, body));
   }
   if (path === "fx/rate" && method === "GET") {
     return jsonOk(await supabaseFxRate(userId));

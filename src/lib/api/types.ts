@@ -8,6 +8,8 @@ export interface User {
   email: string;
   name: string;
   displayCurrency: Currency;
+  targetProfitPercentage?: number;
+  targetLossPercentage?: number;
   createdAt: string;
 }
 
@@ -66,6 +68,8 @@ export interface InvestmentSync {
 
 export interface UserSettings {
   displayCurrency: Currency;
+  targetProfitPercentage?: number;
+  targetLossPercentage?: number;
 }
 
 export interface FxRate {
@@ -181,7 +185,6 @@ export interface UpdateInvestmentRequest {
 export interface StockTrade {
   id: string;
   userId: string;
-  name?: string;
   symbol: string;
   buyDate: string;
   buyPrice: number;
@@ -202,7 +205,6 @@ export interface StockTradeMetrics {
 }
 
 export interface CreateStockTradeRequest {
-  name?: string | null;
   symbol: string;
   buyDate: string;
   buyPrice: number;
@@ -215,20 +217,20 @@ export interface CreateStockTradeRequest {
 export interface StockAnalysis {
   id: string;
   userId: string;
-  name: string;
   symbol: string;
   buyDate: string;
   buyPrice: number;
   targetReturnPercentage: number;
+  exitedDate?: string;
   createdAt: string;
 }
 
 export interface CreateStockAnalysisRequest {
-  name: string;
   symbol: string;
   buyDate: string;
   buyPrice: number;
   targetReturnPercentage: number;
+  exitedDate?: string | null;
 }
 
 export interface ApiError {

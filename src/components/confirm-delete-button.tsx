@@ -45,7 +45,7 @@ export function ConfirmDeleteButton({
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger render={<Button variant="outline" size="icon-sm" disabled={pending} />}>
+      <AlertDialogTrigger render={<Button variant="destructive" size="icon-sm" disabled={pending} />}>
         <Trash2Icon />
         <span className="sr-only">Delete</span>
       </AlertDialogTrigger>

@@ -16,8 +16,10 @@ import {
   calculateExposures,
 } from "@/lib/finance/exposure";
 import { getFxRate } from "@/lib/finance/currency";
+import { buildAnalysisCsv, analysisCsvFilename } from "@/lib/finance/analysis-csv";
 import { buildTradeCsv, tradeCsvFilename } from "@/lib/finance/trade-csv";
-import { tradeTotals } from "@/lib/finance/trades";
+import { analysisIsOpen, tradeTotals } from "@/lib/finance/trades";
+import { sendAnalysisCsvEmail } from "@/lib/email/analysis";
 import { sendTradeCsvEmail } from "@/lib/email/trades";
 import { buildSecurityFromCompany, buildSecurityFromInput, normalizeTicker } from "@/lib/investments/security";
 import { isFundVehicle, normalizeSourceUrl } from "@/lib/investments/fund-url";
@@ -741,24 +743,61 @@ export async function supabaseDeleteAccount(userId: string, password: string) {
 
 export async function supabaseGetSettings(userId: string) {
   const user = await supabaseMe(userId);
-  return { displayCurrency: user.displayCurrency };
+  return {
+    displayCurrency: user.displayCurrency,
+    targetProfitPercentage: user.targetProfitPercentage,
+    targetLossPercentage: user.targetLossPercentage,
+  };
 }
 
-export async function supabaseUpdateSettings(userId: string, displayCurrency: Currency) {
-  if (displayCurrency !== "INR" && displayCurrency !== "USD") {
-    throwQueryError("Unsupported display currency.", 400);
+export async function supabaseUpdateSettings(
+  userId: string,
+  input: {
+    displayCurrency?: Currency;
+    targetProfitPercentage?: number;
+    targetLossPercentage?: number;
+  },
+) {
+  const patch: {
+    display_currency?: Currency;
+    target_profit_percentage?: number;
+    target_loss_percentage?: number;
+  } = {};
+
+  if (input.displayCurrency !== undefined) {
+    if (input.displayCurrency !== "INR" && input.displayCurrency !== "USD") {
+      throwQueryError("Unsupported display currency.", 400);
+    }
+    patch.display_currency = input.displayCurrency;
   }
+  if (input.targetProfitPercentage !== undefined) {
+    const profit = cleanAmount(input.targetProfitPercentage, "Target profit");
+    if (profit > 1000) {
+      throwQueryError("Target profit must be 1000% or less.", 400);
+    }
+    patch.target_profit_percentage = profit;
+  }
+  if (input.targetLossPercentage !== undefined) {
+    const loss = cleanAmount(input.targetLossPercentage, "Target loss");
+    if (loss > 100) {
+      throwQueryError("Target loss must be 100% or less.", 400);
+    }
+    patch.target_loss_percentage = loss;
+  }
+  if (Object.keys(patch).length === 0) {
+    return supabaseGetSettings(userId);
+  }
+
   const supabase = await client();
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({ display_currency: displayCurrency })
-    .eq("id", userId)
-    .select("display_currency")
-    .maybeSingle();
+  const { data, error } = await supabase.from("profiles").update(patch).eq("id", userId).select("*").maybeSingle();
   if (error || !data) {
     throwQueryError("Unauthorized", 401);
   }
-  return { displayCurrency: data.display_currency };
+  return {
+    displayCurrency: data.display_currency,
+    targetProfitPercentage: data.target_profit_percentage === null ? undefined : Number(data.target_profit_percentage),
+    targetLossPercentage: data.target_loss_percentage === null ? undefined : Number(data.target_loss_percentage),
+  };
 }
 
 export async function supabaseFxRate(userId: string) {
@@ -797,25 +836,6 @@ function cleanDate(value: unknown, label: string): string {
   return text;
 }
 
-function cleanText(value: unknown, label: string, max: number): string {
-  const text = String(value ?? "").trim();
-  if (!text || text.length > max) {
-    throwQueryError(`${label} must be between 1 and ${max} characters.`, 400);
-  }
-  return text;
-}
-
-function optionalText(value: unknown, label: string, max: number): string | null {
-  const text = String(value ?? "").trim();
-  if (!text) {
-    return null;
-  }
-  if (text.length > max) {
-    throwQueryError(`${label} must be at most ${max} characters.`, 400);
-  }
-  return text;
-}
-
 function cleanAmount(value: unknown, label: string, { allowZero = false } = {}): number {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount < 0 || (!allowZero && amount <= 0)) {
@@ -847,7 +867,6 @@ function tradeRowFromInput(input: CreateStockTradeRequest) {
   }
 
   return {
-    name: optionalText(input.name, "Name", 120),
     symbol: cleanSymbol(input.symbol),
     buy_date: buyDate,
     buy_price: cleanAmount(input.buyPrice, "Buying price"),
@@ -934,13 +953,43 @@ export async function supabaseEmailTrades(userId: string) {
   });
 }
 
+export async function supabaseEmailAnalysis(userId: string) {
+  const user = await supabaseMe(userId);
+  const entries = await supabaseListAnalysis(userId);
+  if (entries.length === 0) {
+    throwQueryError("There are no analysis rows to email.", 400);
+  }
+
+  const inProgress = entries.filter(analysisIsOpen).length;
+  const filename = analysisCsvFilename();
+  return sendAnalysisCsvEmail({
+    name: user.name,
+    email: user.email,
+    filename,
+    csv: buildAnalysisCsv(entries, {
+      profit: user.targetProfitPercentage,
+      loss: user.targetLossPercentage,
+    }),
+    entryCount: entries.length,
+    inProgress,
+    exited: entries.length - inProgress,
+  });
+}
+
 function analysisRowFromInput(input: CreateStockAnalysisRequest) {
+  const buyDate = cleanDate(input.buyDate, "Buy date");
+  const exitedDate = String(input.exitedDate ?? "").trim()
+    ? cleanDate(input.exitedDate, "Exited date")
+    : null;
+  if (exitedDate && exitedDate < buyDate) {
+    throwQueryError("Exited date cannot be before the buy date.", 400);
+  }
   return {
-    name: cleanText(input.name, "Name", 120),
     symbol: cleanSymbol(input.symbol),
-    buy_date: cleanDate(input.buyDate, "Buy date"),
+    buy_date: buyDate,
     buy_price: cleanAmount(input.buyPrice, "Buying price"),
     target_return_percentage: cleanAmount(input.targetReturnPercentage, "Target return"),
+    exited_date: exitedDate,
   };
 }
 
@@ -950,6 +999,7 @@ export async function supabaseListAnalysis(userId: string) {
     .from("stock_analysis")
     .select("*")
     .eq("user_id", userId)
+    .order("buy_date", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) {
     throwQueryError("Unable to load stock analysis.", 500);

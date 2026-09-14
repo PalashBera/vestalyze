@@ -48,6 +48,8 @@ create table public.profiles (
   display_currency public.currency_code not null default 'INR',
   fx_usd_inr numeric not null default 87.25 check (fx_usd_inr > 0),
   fx_as_of date not null default (timezone('utc', now()))::date,
+  target_profit_percentage numeric check (target_profit_percentage is null or (target_profit_percentage > 0 and target_profit_percentage <= 1000)),
+  target_loss_percentage numeric check (target_loss_percentage is null or (target_loss_percentage > 0 and target_loss_percentage <= 100)),
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -63,6 +65,10 @@ comment on column public.profiles.fx_usd_inr is
   'User-supplied USD/INR rate used to combine Indian and US amounts into one number.';
 comment on column public.profiles.fx_as_of is
   'Date the user last set fx_usd_inr. Shown next to the rate so a stale rate is visible.';
+comment on column public.profiles.target_profit_percentage is
+  'Share of each analysis row target return used for Sell Target. Sell target = buy price * (1 + this / 100 * target return / 100).';
+comment on column public.profiles.target_loss_percentage is
+  'Share of each analysis row target return used for Stop Loss. Stop loss = buy price * (1 - this / 100 * target return / 100).';
 comment on column public.profiles.created_at is 'Account creation timestamp.';
 
 -- securities ----------------------------------------------------------------
@@ -228,7 +234,6 @@ comment on column public.investment_syncs.error_message is 'Failure reason shown
 create table public.stock_trades (
   id text primary key default gen_random_uuid()::text,
   user_id uuid not null references auth.users (id) on delete cascade,
-  name text check (name is null or char_length(name) between 1 and 120),
   symbol text not null check (char_length(symbol) between 1 and 20),
   buy_date date not null,
   buy_price numeric not null check (buy_price > 0),
@@ -250,8 +255,6 @@ comment on table public.stock_trades is
   'Realised and open stock trades. A standalone journal: these rows never affect portfolio totals or look-through exposure.';
 comment on column public.stock_trades.id is 'Generated uuid.';
 comment on column public.stock_trades.user_id is 'Owner. RLS filters on this column.';
-comment on column public.stock_trades.name is
-  'Optional company name as the user typed it. Blank when a trade was imported from a ticker-only source.';
 comment on column public.stock_trades.symbol is 'Exchange symbol, uppercased on write. Groups trades in the same company.';
 comment on column public.stock_trades.buy_date is 'Purchase date. Start of the holding duration.';
 comment on column public.stock_trades.buy_price is 'Price per share paid. Multiplied by quantity to get the total purchase amount.';
@@ -267,26 +270,30 @@ comment on column public.stock_trades.created_at is 'Row creation timestamp.';
 create table public.stock_analysis (
   id text primary key default gen_random_uuid()::text,
   user_id uuid not null references auth.users (id) on delete cascade,
-  name text not null check (char_length(name) between 1 and 120),
   symbol text not null check (char_length(symbol) between 1 and 20),
   buy_date date not null,
   buy_price numeric not null check (buy_price > 0),
   target_return_percentage numeric not null check (target_return_percentage > 0),
-  created_at timestamptz not null default timezone('utc', now())
+  exited_date date,
+  created_at timestamptz not null default timezone('utc', now()),
+  constraint stock_analysis_exited_after_buy check (
+    exited_date is null or exited_date >= buy_date
+  )
 );
 
-create index stock_analysis_user_idx on public.stock_analysis (user_id, created_at desc);
+create index stock_analysis_user_idx on public.stock_analysis (user_id, buy_date desc);
 
 comment on table public.stock_analysis is
   'Price targets the user is tracking. Standalone, like stock_trades: nothing here reaches the portfolio pages.';
 comment on column public.stock_analysis.id is 'Generated uuid.';
 comment on column public.stock_analysis.user_id is 'Owner. RLS filters on this column.';
-comment on column public.stock_analysis.name is 'Company name as the user typed it.';
 comment on column public.stock_analysis.symbol is 'Exchange symbol, uppercased on write.';
 comment on column public.stock_analysis.buy_date is 'Date the entry price was taken.';
 comment on column public.stock_analysis.buy_price is 'Entry price per share. The base the target is calculated from.';
 comment on column public.stock_analysis.target_return_percentage is
   'Return the user is aiming for. Target price is buy_price * (1 + this / 100), computed at read time and never stored.';
+comment on column public.stock_analysis.exited_date is
+  'Optional date the thesis was closed. Null means the analysis is still in progress.';
 comment on column public.stock_analysis.created_at is 'Row creation timestamp.';
 
 -- new user trigger ----------------------------------------------------------

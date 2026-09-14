@@ -26,15 +26,23 @@ const currencyItems = [
 ];
 
 export default function SettingsPage() {
-  const { currency, setCurrency, fxRate, setFxRate, user } = useSettings();
+  const { currency, setCurrency, fxRate, setFxRate, user, setTradeTargets } = useSettings();
   const [fxInput, setFxInput] = useState("");
+  const [profitInput, setProfitInput] = useState("");
+  const [lossInput, setLossInput] = useState("");
   const [savingFx, setSavingFx] = useState(false);
+  const [savingTargets, setSavingTargets] = useState(false);
 
   useEffect(() => {
     if (fxRate) {
       setFxInput(String(fxRate.rate));
     }
   }, [fxRate]);
+
+  useEffect(() => {
+    setProfitInput(user?.targetProfitPercentage === undefined ? "" : String(user.targetProfitPercentage));
+    setLossInput(user?.targetLossPercentage === undefined ? "" : String(user.targetLossPercentage));
+  }, [user?.targetProfitPercentage, user?.targetLossPercentage]);
 
   async function onCurrencyChange(value: string | null) {
     if (value !== "INR" && value !== "USD") {
@@ -57,11 +65,25 @@ export default function SettingsPage() {
     }
   }
 
+  async function onSaveTargets() {
+    const profit = Number(profitInput);
+    const loss = Number(lossInput);
+    setSavingTargets(true);
+    try {
+      await setTradeTargets({ targetProfitPercentage: profit, targetLossPercentage: loss });
+      toast.success("Profit and loss targets updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to save profit and loss targets");
+    } finally {
+      setSavingTargets(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Settings"
-        description="Display currency, USD/INR rate, and account details."
+        description="Display currency, USD/INR rate, analysis targets, and account details."
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -113,6 +135,58 @@ export default function SettingsPage() {
                   Used for India vs US totals. Last set {fxRate?.asOf ?? "—"}.
                 </FieldDescription>
               </Field>
+            </FieldGroup>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Analysis targets</CardTitle>
+            <CardDescription>
+              Used on Stock Analysis as a share of each row's target return, not of the buying price alone.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="targetProfit">Target profit %</FieldLabel>
+                <Input
+                  id="targetProfit"
+                  type="number"
+                  inputMode="decimal"
+                  min="0.01"
+                  max="1000"
+                  step="0.01"
+                  value={profitInput}
+                  onChange={(event) => setProfitInput(event.target.value)}
+                  className="w-full sm:w-40"
+                />
+                <FieldDescription>
+                  Sell Target = buying price × (1 + this % × the row's target %). A ₹100 buy with a
+                  20% target and 80% here is ₹116.
+                </FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="targetLoss">Target loss %</FieldLabel>
+                <Input
+                  id="targetLoss"
+                  type="number"
+                  inputMode="decimal"
+                  min="0.01"
+                  max="100"
+                  step="0.01"
+                  value={lossInput}
+                  onChange={(event) => setLossInput(event.target.value)}
+                  className="w-full sm:w-40"
+                />
+                <FieldDescription>
+                  Stop Loss = buying price × (1 − this % × the row's target %). A ₹100 buy with a
+                  20% target and 80% here is ₹84.
+                </FieldDescription>
+              </Field>
+              <Button type="button" onClick={() => void onSaveTargets()} disabled={savingTargets} className="w-fit">
+                {savingTargets ? <Spinner data-icon="inline-start" /> : null}
+                Save targets
+              </Button>
             </FieldGroup>
           </CardContent>
         </Card>

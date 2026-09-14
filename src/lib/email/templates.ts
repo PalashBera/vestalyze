@@ -250,3 +250,42 @@ export function tradeExportEmail(input: {
     ].join("\n"),
   };
 }
+
+export function analysisExportEmail(input: {
+  name: string;
+  email: string;
+  filename: string;
+  entryCount: number;
+  inProgress: number;
+  exited: number;
+}): { subject: string; html: string; text: string } {
+  const firstName = input.name.split(/\s+/)[0] || input.name;
+  const content = detailTable([
+    { label: "File", value: escapeHtml(input.filename), mono: true },
+    { label: "Entries", value: String(input.entryCount) },
+    { label: "In progress", value: String(input.inProgress) },
+    { label: "Exited", value: String(input.exited) },
+  ]);
+
+  return {
+    subject: `Your stock analysis CSV — ${APP_NAME}`,
+    html: shell({
+      preheader: `${input.entryCount} analysis rows attached as ${input.filename}.`,
+      badge: "Export",
+      heading: `Your analysis watchlist, ${escapeHtml(firstName)}`,
+      intro: `A CSV of every stock analysis row on this ${escapeHtml(APP_NAME)} account is attached. Open rows are marked In Progress and leave the exited date blank.`,
+      content,
+      footnote: `Sent to ${escapeHtml(input.email)} because you asked for an export from Stock Analysis. If that was not you, you can ignore this email.`,
+    }),
+    text: [
+      `Your analysis watchlist, ${firstName}`,
+      "",
+      `A CSV of every stock analysis row on this ${APP_NAME} account is attached.`,
+      "",
+      `File: ${input.filename}`,
+      `Entries: ${input.entryCount}`,
+      `In progress: ${input.inProgress}`,
+      `Exited: ${input.exited}`,
+    ].join("\n"),
+  };
+}

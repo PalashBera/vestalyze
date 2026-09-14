@@ -39,12 +39,13 @@ export function StockAnalysisForm({
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const exitedDate = String(formData.get("exitedDate") ?? "").trim();
     const payload: CreateStockAnalysisRequest = {
-      name: String(formData.get("name") ?? "").trim(),
       symbol: String(formData.get("symbol") ?? "").trim(),
       buyDate: String(formData.get("buyDate") ?? ""),
       buyPrice: Number(formData.get("buyPrice")),
       targetReturnPercentage: Number(formData.get("targetReturnPercentage")),
+      exitedDate: exitedDate || null,
     };
 
     setPending(true);
@@ -85,37 +86,24 @@ export function StockAnalysisForm({
         <DialogHeader>
           <DialogTitle>{editing ? "Edit analysis" : "Add analysis"}</DialogTitle>
           <DialogDescription>
-            Set the return you are aiming for and the target price is worked out for you.
+            Set the return you are aiming for. Leave exited date empty while the thesis is still open.
           </DialogDescription>
         </DialogHeader>
         <form key={`${entry?.id ?? "new"}-${open}`} className="flex flex-col gap-5" onSubmit={onSubmit}>
           <FieldGroup>
-            <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
-              <Field>
-                <FieldLabel htmlFor="analysis-name">Name</FieldLabel>
-                <Input
-                  id="analysis-name"
-                  name="name"
-                  required
-                  maxLength={120}
-                  defaultValue={entry?.name}
-                  placeholder="Infosys"
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="analysis-symbol">Symbol</FieldLabel>
-                <Input
-                  id="analysis-symbol"
-                  name="symbol"
-                  required
-                  maxLength={20}
-                  defaultValue={entry?.symbol}
-                  placeholder="INFY"
-                  className="uppercase"
-                />
-              </Field>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="analysis-symbol">Symbol</FieldLabel>
+              <Input
+                id="analysis-symbol"
+                name="symbol"
+                required
+                maxLength={20}
+                defaultValue={entry?.symbol}
+                placeholder="INFY"
+                className="uppercase"
+              />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="analysis-buy-date">Buy date</FieldLabel>
                 <Input
@@ -126,6 +114,19 @@ export function StockAnalysisForm({
                   defaultValue={entry?.buyDate ?? today()}
                 />
               </Field>
+              <Field>
+                <FieldLabel htmlFor="analysis-exited-date">
+                  Exited date <span className="font-normal text-muted-foreground">(optional)</span>
+                </FieldLabel>
+                <Input
+                  id="analysis-exited-date"
+                  name="exitedDate"
+                  type="date"
+                  defaultValue={entry?.exitedDate ?? ""}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="analysis-buy-price">Buying price</FieldLabel>
                 <Input
@@ -154,7 +155,8 @@ export function StockAnalysisForm({
               </Field>
             </div>
             <FieldDescription>
-              Target price is the buying price plus the target return. Amounts are in INR.
+              Target price is the buying price plus the target return. Fill exited date when you close
+              the thesis. Amounts are in INR.
             </FieldDescription>
           </FieldGroup>
           <DialogFooter>

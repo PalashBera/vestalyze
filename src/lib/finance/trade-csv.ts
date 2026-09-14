@@ -2,7 +2,6 @@ import type { StockTrade } from "@/lib/api/types";
 import { tradeMetrics } from "@/lib/finance/trades";
 
 const HEADERS = [
-  "Name",
   "Symbol",
   "Buy Date",
   "Buying Price",
@@ -45,7 +44,6 @@ export function buildTradeCsv(trades: StockTrade[], now = new Date()): string {
     .map((trade) => {
       const metrics = tradeMetrics(trade, now);
       return [
-        csvField(trade.name?.trim() || trade.symbol),
         csvField(trade.symbol),
         csvField(trade.buyDate),
         csvField(money(trade.buyPrice)),

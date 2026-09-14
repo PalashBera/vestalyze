@@ -10,6 +10,8 @@ export type Database = {
           display_currency: "INR" | "USD";
           fx_usd_inr: number;
           fx_as_of: string;
+          target_profit_percentage: number | null;
+          target_loss_percentage: number | null;
           created_at: string;
         };
         Insert: {
@@ -18,6 +20,8 @@ export type Database = {
           display_currency?: "INR" | "USD";
           fx_usd_inr?: number;
           fx_as_of?: string;
+          target_profit_percentage?: number | null;
+          target_loss_percentage?: number | null;
           created_at?: string;
         };
         Update: {
@@ -25,6 +29,8 @@ export type Database = {
           display_currency?: "INR" | "USD";
           fx_usd_inr?: number;
           fx_as_of?: string;
+          target_profit_percentage?: number | null;
+          target_loss_percentage?: number | null;
         };
         Relationships: [];
       };
@@ -128,7 +134,6 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          name: string | null;
           symbol: string;
           buy_date: string;
           buy_price: number;
@@ -140,7 +145,6 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
-          name?: string | null;
           symbol: string;
           buy_date: string;
           buy_price: number;
@@ -150,7 +154,6 @@ export type Database = {
           created_at?: string;
         };
         Update: {
-          name?: string | null;
           symbol?: string;
           buy_date?: string;
           buy_price?: number;
@@ -164,29 +167,29 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          name: string;
           symbol: string;
           buy_date: string;
           buy_price: number;
           target_return_percentage: number;
+          exited_date: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
-          name: string;
           symbol: string;
           buy_date: string;
           buy_price: number;
           target_return_percentage: number;
+          exited_date?: string | null;
           created_at?: string;
         };
         Update: {
-          name?: string;
           symbol?: string;
           buy_date?: string;
           buy_price?: number;
           target_return_percentage?: number;
+          exited_date?: string | null;
         };
         Relationships: [];
       };

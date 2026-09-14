@@ -67,7 +67,8 @@ select table_name, column_name
 from information_schema.columns
 where table_schema = 'public' and data_type = 'numeric'
   and table_name not in ('stock_trades', 'stock_analysis');
--- Expect: profiles.fx_usd_inr, investments.invested_amount,
+-- Expect: profiles.fx_usd_inr, profiles.target_profit_percentage,
+-- profiles.target_loss_percentage, investments.invested_amount,
 -- fund_holdings.allocation_percentage. Nothing else.
 -- The journal tables carry their own prices and are excluded on purpose.
 ```
@@ -121,6 +122,8 @@ One row per account, created by the `handle_new_user` trigger. Holds settings on
 | `display_currency` | Consolidated totals                    | `supabaseUpdateSettings` (`PATCH /settings`)    | `buildOverview` in `exposure.ts`              | Switch INR to USD in Settings; dashboard totals reprice, per-market native amounts do not.                     |
 | `fx_usd_inr`       | India vs US combined totals            | `supabaseUpdateFxRate` (`PATCH /fx/rate`)       | `fxRate()` in `handlers.ts`, then `convert()` | Change the rate; the dashboard FX card and any cross-currency total move together.                             |
 | `fx_as_of`         | Staleness hint next to the rate        | Same as `fx_usd_inr`, always written together   | Dashboard FX card hint, Settings "Last set"   | Save a new rate; the date becomes today. On a brand new signup it is the signup date, not a hardcoded one.     |
+| `target_profit_percentage` | Stock Analysis Sell Target       | `supabaseUpdateSettings` (`PATCH /settings`)    | `/analysis` sell-target column                | Save 80 in Settings; a ₹100 buy with a 20% target shows Sell Target ₹116.00.                                   |
+| `target_loss_percentage`   | Stock Analysis Stop Loss         | Same as `target_profit_percentage`              | `/analysis` stop-loss column                  | Save 80 in Settings; that same row shows Stop Loss ₹84.00.                                                     |
 | `created_at`       | Account age                            | Column default                                  | `mapUser`                                     | `select created_at from profiles` is close to the `auth.users` timestamp.                                      |
 
 Only `select` and `update` policies exist. There is deliberately no insert policy: the trigger creates the row, and the client must never be able to forge one.
@@ -277,7 +280,6 @@ The trade journal behind `/trades`. Amounts are INR. A row with no sale is an op
 | ------------ | -------------------------------------- | --------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `id`         | Row key for edit and delete            | Default `gen_random_uuid()::text`       | `PATCH` / `DELETE /trades/:id`     | —                                                                                                 |
 | `user_id`    | Isolation                              | `supabaseCreateTrade`                   | RLS                                | Sign in as another account; the list comes back empty.                                            |
-| `name`       | First column of the table              | The form, trimmed, or null              | `/trades`                          | Optional. Blank names fall back to the symbol in the table.                                       |
 | `symbol`     | Symbol badge, grouping the same ticker | The form, via `normalizeTicker`         | `/trades`                          | Enter `hdfcbank`; it is stored and displayed as `HDFCBANK`.                                       |
 | `buy_date`   | Buy date column, start of duration     | The form                                | `tradeMetrics` in `finance/trades` | A non-date value is rejected with a 400.                                                          |
 | `buy_price`  | Buying price, and Total Pur Amt        | The form                                | `tradeMetrics`                     | Total Pur Amt equals `buy_price × quantity`. Zero and negatives are rejected by a check.          |
@@ -316,11 +318,11 @@ The watchlist behind `/analysis`. Amounts are INR.
 | -------------------------- | ----------------------------- | --------------------------------- | ------------- | ---------------------------------------------------------------------- |
 | `id`                       | Row key for edit and delete    | Default `gen_random_uuid()::text` | `/analysis/:id` | —                                                                    |
 | `user_id`                  | Isolation                     | `supabaseCreateAnalysis`          | RLS           | As above.                                                            |
-| `name`                     | First column of the table     | The form, trimmed                 | `/analysis`   | —                                                                    |
 | `symbol`                   | Symbol badge                  | The form, via `normalizeTicker`   | `/analysis`   | Lowercase input is stored uppercased.                                |
 | `buy_date`                 | Buy date column               | The form                          | `/analysis`   | —                                                                    |
 | `buy_price`                | Buying price, base of target  | The form                          | `targetPrice` | Halve the price and the target price halves with it.                 |
 | `target_return_percentage` | Target Return % column        | The form                          | `targetPrice` | A zero or negative target is rejected by a check constraint.         |
+| `exited_date`              | Exited column, In Progress vs Exited tabs | The form, or null while open | `/analysis`   | Empty while the thesis is open. An exited date before the buy is 400. |
 | `created_at`               | List ordering, newest first   | Column default                    | `/analysis`   | —                                                                    |
 
 Target Price is derived, never stored — `targetPrice()` in `src/lib/finance/trades.ts`:
@@ -329,7 +331,20 @@ Target Price is derived, never stored — `targetPrice()` in `src/lib/finance/tr
 target_price = buy_price × (1 + target_return_percentage / 100)
 ```
 
-Storing it would let the two drift apart the moment someone edited the entry price, which is exactly the situation rule 2 exists to prevent.
+Sell Target and Stop Loss are also derived at read time. They take a share of the row's target return from `profiles.target_profit_percentage` and `profiles.target_loss_percentage`. They are not columns on `stock_analysis`.
+
+```text
+sell_target = buy_price × (1 + profit% / 100 × target_return% / 100)
+stop_loss   = buy_price × (1 − loss%   / 100 × target_return% / 100)
+```
+
+A ₹100 buy, 20% target, and 80% profit/loss settings is Sell Target ₹116 and Stop Loss ₹84.
+
+```sql
+-- An exit can never precede its purchase.
+select id from stock_analysis where exited_date < buy_date;
+-- Expect: zero rows. stock_analysis_exited_after_buy enforces it.
+```
 
 ---
 

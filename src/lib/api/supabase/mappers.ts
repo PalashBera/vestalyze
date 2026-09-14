@@ -63,16 +63,16 @@ export function mapInvestment(row: Tables["investments"]["Row"]): Investment {
   };
 }
 
-export function mapUser(
-  id: string,
-  email: string,
-  profile: Pick<Tables["profiles"]["Row"], "name" | "display_currency" | "created_at">,
-): User {
+export function mapUser(id: string, email: string, profile: Tables["profiles"]["Row"]): User {
   return {
     id,
     email,
     name: profile.name,
     displayCurrency: profile.display_currency,
+    targetProfitPercentage:
+      profile.target_profit_percentage === null ? undefined : Number(profile.target_profit_percentage),
+    targetLossPercentage:
+      profile.target_loss_percentage === null ? undefined : Number(profile.target_loss_percentage),
     createdAt: profile.created_at,
   };
 }
@@ -93,7 +93,6 @@ export function mapTrade(row: Tables["stock_trades"]["Row"]): StockTrade {
   return {
     id: row.id,
     userId: row.user_id,
-    name: row.name ?? undefined,
     symbol: row.symbol,
     buyDate: row.buy_date,
     buyPrice: Number(row.buy_price),
@@ -108,11 +107,11 @@ export function mapAnalysis(row: Tables["stock_analysis"]["Row"]): StockAnalysis
   return {
     id: row.id,
     userId: row.user_id,
-    name: row.name,
     symbol: row.symbol,
     buyDate: row.buy_date,
     buyPrice: Number(row.buy_price),
     targetReturnPercentage: Number(row.target_return_percentage),
+    exitedDate: row.exited_date ?? undefined,
     createdAt: row.created_at,
   };
 }

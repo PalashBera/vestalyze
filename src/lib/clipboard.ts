@@ -1,0 +1,20 @@
+export async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const field = document.createElement("textarea");
+  field.value = value;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.appendChild(field);
+  field.select();
+  document.execCommand("copy");
+  field.remove();
+}
+
+/** Plain decimal for clipboard: 5604.50, never ₹ or grouping commas. */
+export function copyableAmount(value: number): string {
+  return value.toFixed(2);
+}

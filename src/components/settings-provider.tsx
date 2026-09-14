@@ -13,6 +13,7 @@ type SettingsContextValue = {
   fxRate: FxRate | null;
   setCurrency: (currency: Currency) => Promise<void>;
   setFxRate: (rate: number) => Promise<void>;
+  setTradeTargets: (input: { targetProfitPercentage: number; targetLossPercentage: number }) => Promise<void>;
   refreshUser: () => Promise<void>;
   money: (amountInr: number, compact?: boolean) => string;
   moneyNative: (amount: number, native: Currency, compact?: boolean) => string;
@@ -73,6 +74,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setFxRate(next);
   }
 
+  async function updateTradeTargets(input: { targetProfitPercentage: number; targetLossPercentage: number }) {
+    const settings = await api.settings.updateTargets(input);
+    setUser((current) =>
+      current
+        ? {
+            ...current,
+            targetProfitPercentage: settings.targetProfitPercentage,
+            targetLossPercentage: settings.targetLossPercentage,
+          }
+        : current,
+    );
+  }
+
   const value = useMemo<SettingsContextValue>(() => {
     const displayCurrency = user?.displayCurrency ?? "INR";
     const rate = fxRate?.rate ?? 87.25;
@@ -82,6 +96,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       fxRate,
       setCurrency,
       setFxRate: updateFxRate,
+      setTradeTargets: updateTradeTargets,
       refreshUser,
       money: (amountInr, compact) =>
         formatMoney(convert(amountInr, "INR", displayCurrency, rate), displayCurrency, compact),
