@@ -1,6 +1,6 @@
-import { Resend } from "resend";
 import { throwQueryError } from "@/lib/api/supabase/mappers";
 import { isValidEmail } from "@/lib/auth/password";
+import { createResendClient, deliverEmail, getResendConfig } from "@/lib/email/resend";
 import { contactAckEmail, contactTeamEmail, type ContactMessage } from "@/lib/email/templates";
 
 /**
@@ -8,7 +8,6 @@ import { contactAckEmail, contactTeamEmail, type ContactMessage } from "@/lib/em
  * address that owns the Resend account, so set CONTACT_FROM_EMAIL to an address on a
  * verified domain before the acknowledgement can reach arbitrary visitors.
  */
-const DEFAULT_FROM = "Vestalyze <onboarding@resend.dev>";
 const DEFAULT_TO = "palashbera1234@gmail.com";
 
 const MAX_NAME_LENGTH = 80;
@@ -22,25 +21,14 @@ export type ContactInput = {
 };
 
 function emailConfig() {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) {
+  const config = getResendConfig();
+  if (!config) {
     return null;
   }
   return {
-    apiKey,
-    from: process.env.CONTACT_FROM_EMAIL?.trim() || DEFAULT_FROM,
+    ...config,
     to: process.env.CONTACT_TO_EMAIL?.trim() || DEFAULT_TO,
   };
-}
-
-/** Resolves to an error message, or null when the message was accepted. */
-async function deliver(send: Promise<{ error: { message: string } | null }>): Promise<string | null> {
-  try {
-    const { error } = await send;
-    return error?.message ?? null;
-  } catch (error) {
-    return error instanceof Error ? error.message : "Unknown email error";
-  }
 }
 
 export async function sendContactMessage(input: ContactInput, origin: string) {
@@ -70,13 +58,13 @@ export async function sendContactMessage(input: ContactInput, origin: string) {
   const payload: ContactMessage = { name, email, message, receivedAt: new Date(), origin };
   const team = contactTeamEmail(payload);
   const acknowledgement = contactAckEmail(payload);
-  const resend = new Resend(config.apiKey);
+  const resend = createResendClient(config.apiKey);
 
   // Sent independently rather than as a batch so a rejected acknowledgement
   // (unverified sending domain, bouncing visitor address) still lets the team
   // notification through.
   const [teamError, ackError] = await Promise.all([
-    deliver(
+    deliverEmail(
       resend.emails.send({
         from: config.from,
         to: config.to,
@@ -86,7 +74,7 @@ export async function sendContactMessage(input: ContactInput, origin: string) {
         text: team.text,
       }),
     ),
-    deliver(
+    deliverEmail(
       resend.emails.send({
         from: config.from,
         to: email,

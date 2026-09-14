@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { PageLoader } from "@/components/page-loader";
 import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
 import { StockAnalysisForm } from "@/components/stock-analysis-form";
+import { TruncatedName } from "@/components/truncated-name";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
 import { targetPrice } from "@/lib/finance/trades";
@@ -25,6 +27,25 @@ import { formatDateOnly, formatPercent, formatPrice } from "@/lib/format";
 
 function price(amount: number): string {
   return formatPrice(amount, "INR");
+}
+
+function HintHead({
+  label,
+  hint,
+  className,
+}: {
+  label: string;
+  hint: string;
+  className?: string;
+}) {
+  return (
+    <TableHead className={className}>
+      <Tooltip>
+        <TooltipTrigger render={<span className="cursor-default" />}>{label}</TooltipTrigger>
+        <TooltipContent>{hint}</TooltipContent>
+      </Tooltip>
+    </TableHead>
+  );
 }
 
 export default function AnalysisPage() {
@@ -67,7 +88,7 @@ export default function AnalysisPage() {
               {entries.map((entry) => (
                 <RecordListItem
                   key={entry.id}
-                  title={entry.name}
+                  title={<TruncatedName name={entry.name} />}
                   subtitle={entry.symbol}
                   actions={
                     <div className="flex gap-1">
@@ -85,10 +106,10 @@ export default function AnalysisPage() {
                     </div>
                   }
                   fields={[
-                    { label: "Buy date", value: formatDateOnly(entry.buyDate) },
-                    { label: "Buying price", value: price(entry.buyPrice) },
-                    { label: "Target return", value: formatPercent(entry.targetReturnPercentage) },
-                    { label: "Target price", value: price(targetPrice(entry)) },
+                    { label: "Bought", value: formatDateOnly(entry.buyDate) },
+                    { label: "Buy", value: price(entry.buyPrice) },
+                    { label: "Target %", value: formatPercent(entry.targetReturnPercentage) },
+                    { label: "Target", value: price(targetPrice(entry)) },
                   ]}
                 />
               ))}
@@ -100,17 +121,19 @@ export default function AnalysisPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Symbol</TableHead>
-                    <TableHead>Buy date</TableHead>
-                    <TableHead className="text-right">Buying price</TableHead>
-                    <TableHead className="text-right">Target return %</TableHead>
-                    <TableHead className="text-right">Target price</TableHead>
+                    <HintHead label="Bought" hint="Buy date" />
+                    <HintHead label="Buy" hint="Buying price" className="text-right" />
+                    <HintHead label="Target %" hint="Target return" className="text-right" />
+                    <HintHead label="Target" hint="Target price" className="text-right" />
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {entries.map((entry) => (
                     <TableRow key={entry.id}>
-                      <TableCell className="font-medium">{entry.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <TruncatedName name={entry.name} />
+                      </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{entry.symbol}</Badge>
                       </TableCell>

@@ -76,7 +76,7 @@ Every column also carries a Postgres comment, so the Supabase table editor expla
 | `fund_holdings`    | `id`, `user_id`, `fund_id`, `security_id`, `allocation_percentage`                                                                   | Owner CRUD                          |
 | `investments`      | `id`, `user_id`, `fund_id`, `security_id`, `name`, `type`, `country`, `invested_amount`, `source_url`, `last_synced_at`, `created_at` | Owner CRUD                          |
 | `investment_syncs` | `id`, `user_id`, `investment_id`, `started_at`, `status`, `records_processed`, `error_message`                                       | Owner CRUD                          |
-| `stock_trades`     | `id`, `user_id`, `name`, `symbol`, `buy_date`, `buy_price`, `quantity`, `sell_date`, `sell_price`, `created_at`                       | Owner CRUD                          |
+| `stock_trades`     | `id`, `user_id`, `name` (optional), `symbol`, `buy_date`, `buy_price`, `quantity`, `sell_date`, `sell_price`, `created_at`            | Owner CRUD                          |
 | `stock_analysis`   | `id`, `user_id`, `name`, `symbol`, `buy_date`, `buy_price`, `target_return_percentage`, `created_at`                                  | Owner CRUD                          |
 
 `stock_trades` and `stock_analysis` back the Stock Trades and Stock Analysis screens. They are owned per user like everything else, but join to nothing: no portfolio query reads them, and they never affect dashboard totals or look-through exposure.

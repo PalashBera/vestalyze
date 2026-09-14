@@ -228,7 +228,7 @@ comment on column public.investment_syncs.error_message is 'Failure reason shown
 create table public.stock_trades (
   id text primary key default gen_random_uuid()::text,
   user_id uuid not null references auth.users (id) on delete cascade,
-  name text not null check (char_length(name) between 1 and 120),
+  name text check (name is null or char_length(name) between 1 and 120),
   symbol text not null check (char_length(symbol) between 1 and 20),
   buy_date date not null,
   buy_price numeric not null check (buy_price > 0),
@@ -250,7 +250,8 @@ comment on table public.stock_trades is
   'Realised and open stock trades. A standalone journal: these rows never affect portfolio totals or look-through exposure.';
 comment on column public.stock_trades.id is 'Generated uuid.';
 comment on column public.stock_trades.user_id is 'Owner. RLS filters on this column.';
-comment on column public.stock_trades.name is 'Company name as the user typed it.';
+comment on column public.stock_trades.name is
+  'Optional company name as the user typed it. Blank when a trade was imported from a ticker-only source.';
 comment on column public.stock_trades.symbol is 'Exchange symbol, uppercased on write. Groups trades in the same company.';
 comment on column public.stock_trades.buy_date is 'Purchase date. Start of the holding duration.';
 comment on column public.stock_trades.buy_price is 'Price per share paid. Multiplied by quantity to get the total purchase amount.';

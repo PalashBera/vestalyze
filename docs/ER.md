@@ -288,7 +288,7 @@ A trade journal, separate from the portfolio book above. One row per buy; the sa
 | ------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `id`         | `text` PK               | Default `gen_random_uuid()`.                                                                                  |
 | `user_id`    | `uuid` → `auth.users`   | Tenant. The only relationship this table has.                                                                 |
-| `name`       | `text` (1–120)          | Company name as typed.                                                                                        |
+| `name`       | `text` (1–120), nullable | Optional company name. Blank when imported from a ticker-only source. The table falls back to `symbol`. |
 | `symbol`     | `text` (1–20)           | Exchange symbol, uppercased on write so the same company groups together.                                     |
 | `buy_date`   | `date`                  | Purchase date. Start of the holding duration.                                                                 |
 | `buy_price`  | `numeric` > 0           | Price per share paid. With quantity, gives Total Pur Amt.                                                     |

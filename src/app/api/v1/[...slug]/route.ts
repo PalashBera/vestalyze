@@ -9,6 +9,7 @@ import {
   supabaseDeleteAnalysis,
   supabaseDeleteInvestment,
   supabaseDeleteTrade,
+  supabaseEmailTrades,
   supabaseExposure,
   supabaseExposureDetail,
   supabaseFxRate,
@@ -222,6 +223,13 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
   if (path === "trades" && method === "POST") {
     const input = await request.json();
     return jsonOk({ trade: await supabaseCreateTrade(userId, input) }, { status: 201 });
+  }
+  if (path === "trades/email" && method === "POST") {
+    const limit = consumeAuthAttempt(`trades-email:${userId}`);
+    if (!limit.allowed) {
+      return jsonError("Too many emails. Try again later.", 429);
+    }
+    return jsonOk(await supabaseEmailTrades(userId));
   }
   const tradeMatch = path.match(/^trades\/([^/]+)$/);
   if (tradeMatch && method === "PATCH") {

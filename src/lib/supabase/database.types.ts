@@ -128,7 +128,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          name: string;
+          name: string | null;
           symbol: string;
           buy_date: string;
           buy_price: number;
@@ -140,7 +140,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
-          name: string;
+          name?: string | null;
           symbol: string;
           buy_date: string;
           buy_price: number;
@@ -150,7 +150,7 @@ export type Database = {
           created_at?: string;
         };
         Update: {
-          name?: string;
+          name?: string | null;
           symbol?: string;
           buy_date?: string;
           buy_price?: number;

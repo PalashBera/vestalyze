@@ -181,7 +181,7 @@ export interface UpdateInvestmentRequest {
 export interface StockTrade {
   id: string;
   userId: string;
-  name: string;
+  name?: string;
   symbol: string;
   buyDate: string;
   buyPrice: number;
@@ -202,7 +202,7 @@ export interface StockTradeMetrics {
 }
 
 export interface CreateStockTradeRequest {
-  name: string;
+  name?: string | null;
   symbol: string;
   buyDate: string;
   buyPrice: number;

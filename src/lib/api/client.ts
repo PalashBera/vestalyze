@@ -127,6 +127,7 @@ export const api = {
         body: JSON.stringify(input),
       }),
     remove: (id: string) => request<{ ok: boolean }>(`/trades/${id}`, { method: "DELETE" }),
+    emailCsv: () => request<{ ok: boolean; email: string }>("/trades/email", { method: "POST" }),
   },
   analysis: {
     list: () => request<{ entries: StockAnalysis[] }>("/analysis"),

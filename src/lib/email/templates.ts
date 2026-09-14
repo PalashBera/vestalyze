@@ -202,3 +202,42 @@ export function contactAckEmail(input: ContactMessage): { subject: string; html:
     ].join("\n"),
   };
 }
+
+export function tradeExportEmail(input: {
+  name: string;
+  email: string;
+  filename: string;
+  tradeCount: number;
+  inProgress: number;
+  completed: number;
+}): { subject: string; html: string; text: string } {
+  const firstName = input.name.split(/\s+/)[0] || input.name;
+  const content = detailTable([
+    { label: "File", value: escapeHtml(input.filename), mono: true },
+    { label: "Trades", value: String(input.tradeCount) },
+    { label: "In progress", value: String(input.inProgress) },
+    { label: "Completed", value: String(input.completed) },
+  ]);
+
+  return {
+    subject: `Your stock trades CSV — ${APP_NAME}`,
+    html: shell({
+      preheader: `${input.tradeCount} trades attached as ${input.filename}.`,
+      badge: "Export",
+      heading: `Your trade journal, ${escapeHtml(firstName)}`,
+      intro: `A CSV of every stock trade on this ${escapeHtml(APP_NAME)} account is attached. Open lots are marked In Progress and leave the sale columns blank.`,
+      content,
+      footnote: `Sent to ${escapeHtml(input.email)} because you asked for an export from Stock Trades. If that was not you, you can ignore this email.`,
+    }),
+    text: [
+      `Your trade journal, ${firstName}`,
+      "",
+      `A CSV of every stock trade on this ${APP_NAME} account is attached.`,
+      "",
+      `File: ${input.filename}`,
+      `Trades: ${input.tradeCount}`,
+      `In progress: ${input.inProgress}`,
+      `Completed: ${input.completed}`,
+    ].join("\n"),
+  };
+}

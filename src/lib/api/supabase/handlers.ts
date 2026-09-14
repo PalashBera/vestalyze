@@ -16,6 +16,9 @@ import {
   calculateExposures,
 } from "@/lib/finance/exposure";
 import { getFxRate } from "@/lib/finance/currency";
+import { buildTradeCsv, tradeCsvFilename } from "@/lib/finance/trade-csv";
+import { tradeTotals } from "@/lib/finance/trades";
+import { sendTradeCsvEmail } from "@/lib/email/trades";
 import { buildSecurityFromCompany, buildSecurityFromInput, normalizeTicker } from "@/lib/investments/security";
 import { isFundVehicle, normalizeSourceUrl } from "@/lib/investments/fund-url";
 import { scrapeFundHoldings } from "@/lib/extract/holdings";
@@ -802,6 +805,17 @@ function cleanText(value: unknown, label: string, max: number): string {
   return text;
 }
 
+function optionalText(value: unknown, label: string, max: number): string | null {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return null;
+  }
+  if (text.length > max) {
+    throwQueryError(`${label} must be at most ${max} characters.`, 400);
+  }
+  return text;
+}
+
 function cleanAmount(value: unknown, label: string, { allowZero = false } = {}): number {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount < 0 || (!allowZero && amount <= 0)) {
@@ -833,7 +847,7 @@ function tradeRowFromInput(input: CreateStockTradeRequest) {
   }
 
   return {
-    name: cleanText(input.name, "Name", 120),
+    name: optionalText(input.name, "Name", 120),
     symbol: cleanSymbol(input.symbol),
     buy_date: buyDate,
     buy_price: cleanAmount(input.buyPrice, "Buying price"),
@@ -898,6 +912,26 @@ export async function supabaseDeleteTrade(userId: string, id: string) {
     throwQueryError("Trade not found", 404);
   }
   return { ok: true };
+}
+
+export async function supabaseEmailTrades(userId: string) {
+  const user = await supabaseMe(userId);
+  const trades = await supabaseListTrades(userId);
+  if (trades.length === 0) {
+    throwQueryError("There are no trades to email.", 400);
+  }
+
+  const totals = tradeTotals(trades);
+  const filename = tradeCsvFilename();
+  return sendTradeCsvEmail({
+    name: user.name,
+    email: user.email,
+    filename,
+    csv: buildTradeCsv(trades),
+    tradeCount: trades.length,
+    inProgress: totals.open,
+    completed: totals.closed,
+  });
 }
 
 function analysisRowFromInput(input: CreateStockAnalysisRequest) {

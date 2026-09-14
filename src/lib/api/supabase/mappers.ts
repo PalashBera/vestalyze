@@ -93,7 +93,7 @@ export function mapTrade(row: Tables["stock_trades"]["Row"]): StockTrade {
   return {
     id: row.id,
     userId: row.user_id,
-    name: row.name,
+    name: row.name ?? undefined,
     symbol: row.symbol,
     buyDate: row.buy_date,
     buyPrice: Number(row.buy_price),

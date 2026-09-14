@@ -90,18 +90,17 @@ export function StockTradeForm({
         <DialogHeader>
           <DialogTitle>{editing ? "Edit trade" : "Add trade"}</DialogTitle>
           <DialogDescription>
-            Leave the sale fields empty while the position is still open. You can fill them in later.
+            Name is optional. Leave the sale fields empty while the position is still open.
           </DialogDescription>
         </DialogHeader>
         <form key={`${trade?.id ?? "new"}-${open}`} className="flex flex-col gap-5" onSubmit={onSubmit}>
           <FieldGroup>
             <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
               <Field>
-                <FieldLabel htmlFor="trade-name">Name</FieldLabel>
+                <FieldLabel htmlFor="trade-name">Name <span className="font-normal text-muted-foreground">(optional)</span></FieldLabel>
                 <Input
                   id="trade-name"
                   name="name"
-                  required
                   maxLength={120}
                   defaultValue={trade?.name}
                   placeholder="HDFC Bank"
