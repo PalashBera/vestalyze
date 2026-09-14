@@ -19,18 +19,17 @@ function IndiaBody({ data }: { data: MarketDashboard }) {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Indian market"
-        description="Mutual funds, ETFs, and direct Indian stocks with consolidated company exposure."
+        description="Mutual funds and ETFs with consolidated company exposure."
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Total India" value={moneyNative(data.totalInvestedNative, "INR")} />
         <StatCard label="Mutual funds" value={moneyNative(data.byType.mutualFund, "INR")} />
         <StatCard label="ETFs" value={moneyNative(data.byType.etf, "INR")} />
-        <StatCard label="Direct stocks" value={moneyNative(data.byType.stock, "INR")} />
       </div>
       <Card>
         <CardHeader>
           <CardTitle>Consolidated Indian stock exposure</CardTitle>
-          <CardDescription>Same company combined across funds, ETFs, and direct holdings.</CardDescription>
+          <CardDescription>Same company combined across funds and ETFs.</CardDescription>
         </CardHeader>
         <CardContent>
           {data.exposures.length > 0 ? (
@@ -70,12 +69,12 @@ export default function IndiaPage() {
       <div className="flex flex-col gap-6">
         <PageHeader
           title="Indian market"
-          description="Mutual funds, ETFs, and direct Indian stocks with consolidated company exposure."
+          description="Mutual funds and ETFs with consolidated company exposure."
         />
         <EmptyState
           icon={LandmarkIcon}
           title="No Indian holdings yet"
-          description="Add an Indian mutual fund, ETF, or stock to see your consolidated exposure for this market."
+          description="Add an Indian mutual fund or ETF to see your consolidated exposure for this market."
           href="/onboarding"
           actionLabel="Add an Indian holding"
         />

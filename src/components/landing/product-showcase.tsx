@@ -35,7 +35,7 @@ export function LandingProductShowcase() {
       <TabsContent value="exposure">
         <AppWindow label="vestalyze.app/exposure">
           <p className="mb-3 text-xs text-muted-foreground">
-            Company exposure combined across mutual funds, ETFs, and direct lots. Sortable on every column.
+            Company exposure combined across mutual funds and ETFs. Sortable on every column.
           </p>
           <ExposureTable rows={placeholderExposures} disableLinks />
         </AppWindow>
@@ -93,7 +93,7 @@ export function LandingProductShowcase() {
       <TabsContent value="holdings">
         <AppWindow label="vestalyze.app/investments">
           <p className="mb-3 text-xs text-muted-foreground">
-            Funds, ETFs, and stocks with invested amount and the last holdings sync.
+            Funds and ETFs with invested amount and the last holdings sync.
           </p>
           <RecordList>
             {placeholderInvestments.map((item) => (

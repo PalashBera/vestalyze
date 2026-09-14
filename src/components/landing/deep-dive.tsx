@@ -13,13 +13,13 @@ const stats = [
     icon: LayersIcon,
     value: "3",
     label: "Instrument types",
-    body: "Mutual funds, ETFs, and direct stocks sit in the same ledger.",
+    body: "Mutual funds and ETFs sit in the same ledger.",
   },
   {
     icon: TargetIcon,
     value: "1",
     label: "Number per company",
-    body: "Fund slices and direct lots collapse into a single exposure and weight.",
+    body: "Fund slices collapse into a single exposure and weight.",
   },
   {
     icon: ShieldIcon,

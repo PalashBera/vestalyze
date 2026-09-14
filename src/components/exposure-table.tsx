@@ -18,7 +18,7 @@ import { DesktopTable, RecordList, RecordListItem } from "@/components/record-li
 import { formatPercent } from "@/lib/format";
 
 type Variant = "consolidated" | "india" | "us";
-type SortKey = "company" | "india" | "us" | "total" | "weight" | "mf" | "etf" | "direct";
+type SortKey = "company" | "india" | "us" | "total" | "weight" | "mf" | "etf";
 
 function valueFor(row: StockExposure, key: SortKey): string | number {
   switch (key) {
@@ -36,8 +36,6 @@ function valueFor(row: StockExposure, key: SortKey): string | number {
       return row.mutualFundInvestedInr;
     case "etf":
       return row.etfInvestedInr;
-    case "direct":
-      return row.directInvestedInr;
     default:
       return 0;
   }
@@ -119,13 +117,11 @@ export function ExposureTable({
       return [
         { label: "Mutual Funds", value: money(row.mutualFundInvestedInr) },
         { label: "ETFs", value: money(row.etfInvestedInr) },
-        { label: "Direct", value: money(row.directInvestedInr) },
         { label: "Total", value: money(row.totalInvestedInr) },
         { label: "Weight", value: formatPercent(row.portfolioPercentage) },
       ];
     }
     return [
-      { label: "Direct", value: money(row.directInvestedInr) },
       { label: "ETF", value: money(row.etfInvestedInr) },
       { label: "Total", value: money(row.totalInvestedInr) },
       { label: "Weight", value: formatPercent(row.portfolioPercentage) },
@@ -161,14 +157,12 @@ export function ExposureTable({
               <SortableHead label="Company" column="company" active={sortKey} direction={direction} onSort={onSort} />
               <SortableHead label="Mutual Funds" column="mf" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="ETFs" column="etf" active={sortKey} direction={direction} align="right" onSort={onSort} />
-              <SortableHead label="Direct" column="direct" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="Total" column="total" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="Weight" column="weight" active={sortKey} direction={direction} align="right" onSort={onSort} />
             </>
           ) : (
             <>
               <SortableHead label="Company" column="company" active={sortKey} direction={direction} onSort={onSort} />
-              <SortableHead label="Direct" column="direct" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="ETF" column="etf" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="Total" column="total" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="Weight" column="weight" active={sortKey} direction={direction} align="right" onSort={onSort} />
@@ -202,13 +196,9 @@ export function ExposureTable({
               <>
                 <TableCell className="text-right">{money(row.mutualFundInvestedInr)}</TableCell>
                 <TableCell className="text-right">{money(row.etfInvestedInr)}</TableCell>
-                <TableCell className="text-right">{money(row.directInvestedInr)}</TableCell>
               </>
             ) : (
-              <>
-                <TableCell className="text-right">{money(row.directInvestedInr)}</TableCell>
-                <TableCell className="text-right">{money(row.etfInvestedInr)}</TableCell>
-              </>
+              <TableCell className="text-right">{money(row.etfInvestedInr)}</TableCell>
             )}
             <TableCell className="text-right font-medium">{money(row.totalInvestedInr)}</TableCell>
             <TableCell className="text-right">{formatPercent(row.portfolioPercentage)}</TableCell>

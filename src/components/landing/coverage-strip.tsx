@@ -3,7 +3,6 @@ import {
   ChartPieIcon,
   CopyIcon,
   EyeIcon,
-  LandmarkIcon,
   LayersIcon,
   RefreshCwIcon,
   TrendingUpIcon,
@@ -14,7 +13,6 @@ const coverage = [
   { icon: ChartPieIcon, label: "Indian ETFs" },
   { icon: ChartPieIcon, label: "US ETFs" },
   { icon: TrendingUpIcon, label: "US stocks" },
-  { icon: LandmarkIcon, label: "Direct equity" },
   { icon: ArrowLeftRightIcon, label: "INR and USD" },
   { icon: RefreshCwIcon, label: "Fund URL sync" },
   { icon: EyeIcon, label: "Holdings look-through" },
@@ -32,7 +30,7 @@ export function LandingCoverageStrip() {
       <div className="flex flex-col items-center gap-8">
         <p className="max-w-2xl text-center font-heading text-xl leading-snug tracking-tight text-balance md:text-2xl">
           One private book for everything you already hold
-          <span className="text-muted-foreground"> — across two markets and three kinds of instrument.</span>
+          <span className="text-muted-foreground"> — across two markets and two kinds of instrument.</span>
         </p>
 
         <ul className="flex flex-wrap items-center justify-center gap-2.5 md:gap-3">

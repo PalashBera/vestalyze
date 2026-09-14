@@ -3,6 +3,17 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = new Set(["/", "/login", "/register"]);
 
+function isPublicAsset(pathname: string): boolean {
+  return (
+    pathname === "/sw.js" ||
+    pathname.startsWith("/manifest") ||
+    pathname.startsWith("/icon") ||
+    pathname.startsWith("/apple-icon") ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/icons/")
+  );
+}
+
 function hasSessionCookie(request: NextRequest): boolean {
   return request.cookies.getAll().some((cookie) => {
     return cookie.name.startsWith("sb-") && cookie.name.includes("auth-token");
@@ -21,7 +32,7 @@ export function proxy(request: NextRequest) {
     return response;
   }
 
-  if (!hasSession && !isPublic && pathname !== "/") {
+  if (!hasSession && !isPublic && !isPublicAsset(pathname) && pathname !== "/") {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
@@ -35,5 +46,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };

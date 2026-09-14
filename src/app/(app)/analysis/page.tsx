@@ -2,6 +2,7 @@
 
 import { TargetIcon } from "lucide-react";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { CopySymbol } from "@/components/copy-symbol";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { PageLoader } from "@/components/page-loader";
@@ -9,7 +10,6 @@ import { DesktopTable, RecordList, RecordListItem } from "@/components/record-li
 import { StockAnalysisForm } from "@/components/stock-analysis-form";
 import { TruncatedName } from "@/components/truncated-name";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -89,7 +89,7 @@ export default function AnalysisPage() {
                 <RecordListItem
                   key={entry.id}
                   title={<TruncatedName name={entry.name} />}
-                  subtitle={entry.symbol}
+                  subtitle={<CopySymbol symbol={entry.symbol} badge={false} />}
                   actions={
                     <div className="flex gap-1">
                       <StockAnalysisForm entry={entry} onSaved={() => void reload()} />
@@ -135,7 +135,7 @@ export default function AnalysisPage() {
                         <TruncatedName name={entry.name} />
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{entry.symbol}</Badge>
+                        <CopySymbol symbol={entry.symbol} />
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {formatDateOnly(entry.buyDate)}

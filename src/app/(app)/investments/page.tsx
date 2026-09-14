@@ -45,14 +45,14 @@ export default function InvestmentsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Investments"
-        description="Mutual funds, ETFs, and stocks with invested amount and last holdings sync."
+        description="Mutual funds and ETFs with invested amount and last holdings sync."
         actions={<InvestmentForm onSaved={() => void reload()} />}
       />
       {data.investments.length === 0 ? (
         <EmptyState
           icon={WalletIcon}
           title="No investments yet"
-          description="Add a mutual fund, ETF, or stock to start building your book."
+          description="Add a mutual fund or ETF to start building your book."
           action={<InvestmentForm onSaved={() => void reload()} />}
         />
       ) : (

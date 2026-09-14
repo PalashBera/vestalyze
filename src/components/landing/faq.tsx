@@ -31,7 +31,7 @@ const faqs = [
     value: "markets",
     question: "Can I track both India and the US?",
     answer:
-      "Yes. Mutual funds, ETFs, and direct stocks across both markets live in one book, with a dedicated page per market and a consolidated view across them.",
+      "Yes. Mutual funds and ETFs across both markets live in one book, with a dedicated page per market and a consolidated view across them.",
   },
   {
     value: "delete",

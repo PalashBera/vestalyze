@@ -19,17 +19,16 @@ function UsBody({ data }: { data: MarketDashboard }) {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="US market"
-        description="Direct US stocks and ETF look-through exposure in US dollars."
+        description="US ETF look-through exposure in US dollars."
       />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <StatCard label="Total US" value={moneyNative(data.totalInvestedNative, "USD")} />
         <StatCard label="US ETFs" value={moneyNative(data.byType.etf, "USD")} />
-        <StatCard label="Direct stocks" value={moneyNative(data.byType.stock, "USD")} />
       </div>
       <Card>
         <CardHeader>
           <CardTitle>Consolidated US stock exposure</CardTitle>
-          <CardDescription>Direct holdings plus ETF look-through allocations.</CardDescription>
+          <CardDescription>ETF look-through allocations by company.</CardDescription>
         </CardHeader>
         <CardContent>
           {data.exposures.length > 0 ? (
@@ -37,7 +36,7 @@ function UsBody({ data }: { data: MarketDashboard }) {
           ) : (
             <EmptyState
               title="No stock exposure yet"
-              description="Add a US stock or sync a US ETF URL to fill look-through company exposure."
+              description="Add a US ETF URL and sync holdings to fill look-through company exposure."
               href="/onboarding?country=US"
               actionLabel="Add a US holding"
             />
@@ -69,12 +68,12 @@ export default function UsPage() {
       <div className="flex flex-col gap-6">
         <PageHeader
           title="US market"
-          description="Direct US stocks and ETF look-through exposure in US dollars."
+          description="US ETF look-through exposure in US dollars."
         />
         <EmptyState
           icon={ChartPieIcon}
           title="No US holdings yet"
-          description="Add a US stock or ETF to see your consolidated exposure for this market."
+          description="Add a US ETF to see your consolidated exposure for this market."
           href="/onboarding?country=US"
           actionLabel="Add a US holding"
         />

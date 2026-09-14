@@ -252,7 +252,7 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
   if (!input.name?.trim()) {
     throwQueryError("Investment name is required.", 400);
   }
-  if (!["mutual_fund", "etf", "stock"].includes(input.type)) {
+  if (!["mutual_fund", "etf"].includes(input.type)) {
     throwQueryError("Invalid investment type.", 400);
   }
   if (!["IN", "US"].includes(input.country)) {

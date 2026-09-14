@@ -137,8 +137,6 @@ export const placeholderInvestments: Array<Pick<Investment, "id" | "name" | "typ
   { id: "pi-2", name: "Nippon India Nifty 50 ETF", type: "etf", country: "IN", currency: "INR", invested: "₹3,80,000", lastSync: "12 Aug 2026" },
   { id: "pi-3", name: "Parag Parikh Flexi Cap Direct", type: "mutual_fund", country: "IN", currency: "INR", invested: "₹6,10,000", lastSync: "3 Jul 2026" },
   { id: "pi-4", name: "Invesco QQQ", type: "etf", country: "US", currency: "USD", invested: "$8,400", lastSync: "12 Aug 2026" },
-  { id: "pi-5", name: "Apple", type: "stock", country: "US", currency: "USD", invested: "$5,000", lastSync: "—" },
-  { id: "pi-6", name: "HDFC Bank", type: "stock", country: "IN", currency: "INR", invested: "₹2,15,000", lastSync: "—" },
 ];
 
 export const placeholderOverlaps: FundOverlap[] = [

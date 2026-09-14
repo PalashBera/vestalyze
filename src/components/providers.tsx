@@ -1,6 +1,7 @@
 "use client";
 
 import { ThemeProvider } from "next-themes";
+import { PwaRegister } from "@/components/pwa-register";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { SettingsProvider } from "@/components/settings-provider";
@@ -18,6 +19,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <SettingsProvider>
           {children}
           <Toaster />
+          <PwaRegister />
         </SettingsProvider>
       </TooltipProvider>
     </ThemeProvider>

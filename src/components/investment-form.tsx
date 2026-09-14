@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { PencilIcon, RefreshCwIcon } from "lucide-react";
 import { api } from "@/lib/api/client";
 import type { Country, CreateInvestmentRequest, Investment, InvestmentType } from "@/lib/api/types";
+import { typeLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,7 +31,6 @@ import { Spinner } from "@/components/ui/spinner";
 const typeItems = [
   { label: "Mutual Fund", value: "mutual_fund" },
   { label: "ETF", value: "etf" },
-  { label: "Direct Stock", value: "stock" },
 ];
 
 const countryItems = [
@@ -75,25 +75,28 @@ export function InvestmentFields({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel>Type</FieldLabel>
-          <Select
-            items={typeItems}
-            value={type}
-            disabled={lockType}
-            onValueChange={(value) => onTypeChange(value as InvestmentType)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {typeItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          {lockType ? (
+            <Input value={typeLabel(type)} disabled />
+          ) : (
+            <Select
+              items={typeItems}
+              value={type}
+              onValueChange={(value) => onTypeChange(value as InvestmentType)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {typeItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          )}
         </Field>
         <Field>
           <FieldLabel>Country</FieldLabel>
@@ -132,12 +135,6 @@ export function InvestmentFields({
           <FieldDescription>
             Public factsheet used to scrape the stock split from the holdings section.
           </FieldDescription>
-        </Field>
-      ) : null}
-      {type === "stock" && !lockType ? (
-        <Field>
-          <FieldLabel htmlFor="ticker">Stock code</FieldLabel>
-          <Input id="ticker" name="ticker" required maxLength={16} defaultValue={defaults?.ticker} placeholder="HDFCBANK" />
         </Field>
       ) : null}
       <Field>
@@ -265,7 +262,7 @@ export function InvestmentForm({
           <DialogDescription>
             {editing
               ? "Update the invested amount or the fund URL used for holdings sync."
-              : "Track a mutual fund, ETF, or direct stock you already hold."}
+              : "Track a mutual fund or ETF you already hold."}
           </DialogDescription>
         </DialogHeader>
         <form

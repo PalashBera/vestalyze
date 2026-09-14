@@ -193,7 +193,6 @@ export function buildOverview(
     typeAllocation: [
       slice("mutual_fund", "Mutual Funds", mutualFundInvestedInr, totalInvestedInr, usdInr),
       slice("etf", "ETFs", etfInvestedInr, totalInvestedInr, usdInr),
-      slice("stock", "Direct Stocks", stockInvestedInr, totalInvestedInr, usdInr),
     ],
     topHoldings: exposures.slice(0, 10),
   };

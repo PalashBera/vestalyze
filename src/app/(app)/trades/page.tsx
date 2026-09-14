@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowDownIcon, ArrowLeftRightIcon, ArrowUpDownIcon, ArrowUpIcon } from "lucide-react";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { CopySymbol } from "@/components/copy-symbol";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { PageLoader } from "@/components/page-loader";
@@ -225,7 +226,7 @@ function TradeRows({
               title={<TruncatedName name={tradeLabel(trade)} />}
               subtitle={
                 <span className="flex items-center gap-2">
-                  {trade.symbol}
+                  <CopySymbol symbol={trade.symbol} badge={false} />
                   {metrics.isOpen ? <Badge variant="secondary">In progress</Badge> : null}
                 </span>
               }
@@ -372,7 +373,7 @@ function TradeRows({
                     <TruncatedName name={tradeLabel(trade)} />
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{trade.symbol}</Badge>
+                    <CopySymbol symbol={trade.symbol} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{formatDateOnly(trade.buyDate)}</TableCell>
                   <TableCell className="text-right">{price(trade.buyPrice)}</TableCell>

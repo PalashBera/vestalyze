@@ -30,13 +30,13 @@ function DashboardBody({ data }: { data: PortfolioOverview }) {
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <AllocationChart title="Market split" description="India vs United States" data={data.marketAllocation} />
-        <AllocationChart title="Investment type" description="Mutual funds, ETFs, and stocks" data={data.typeAllocation} />
+        <AllocationChart title="Investment type" description="Mutual funds and ETFs" data={data.typeAllocation} />
       </div>
       <Card>
         <CardHeader>
           <CardTitle>Top company exposure</CardTitle>
           <CardDescription>
-            Direct holdings plus look-through allocations from mutual funds and ETFs.
+            Look-through allocations from mutual funds and ETFs.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -82,7 +82,7 @@ export default function DashboardPage() {
         <EmptyState
           icon={LayoutDashboardIcon}
           title="Nothing here yet"
-          description="Add a mutual fund, ETF, or stock and your consolidated exposure will appear here."
+          description="Add a mutual fund or ETF and your consolidated exposure will appear here."
           href="/onboarding"
           actionLabel="Add your first holding"
         />

@@ -16,7 +16,7 @@ function ExposureBody({ rows }: { rows: StockExposure[] }) {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Consolidated stock exposure"
-        description="Direct stock investments combined with look-through holdings from mutual funds and ETFs."
+        description="Look-through holdings from mutual funds and ETFs."
       />
       <Card>
         <CardHeader>
@@ -52,12 +52,12 @@ export default function ExposurePage() {
       <div className="flex flex-col gap-6">
         <PageHeader
           title="Consolidated stock exposure"
-          description="Direct stock investments combined with look-through holdings from mutual funds and ETFs."
+          description="Look-through holdings from mutual funds and ETFs."
         />
         <EmptyState
           icon={LayersIcon}
           title="No exposure yet"
-          description="Add a holding, then sync its fund URL to see every company you own across funds, ETFs, and direct stocks."
+          description="Add a holding, then sync its fund URL to see every company you own across funds and ETFs."
           href="/investments"
           actionLabel="Open investments"
         />

@@ -49,9 +49,8 @@ export default function ExposureDetailPage({
         title={data.security.standardizedName}
         description={data.security.country === "IN" ? "India" : "United States"}
       />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <StatCard label="Total exposure" value={money(data.totalInvestedInr)} hint={`${formatPercent(data.portfolioPercentage)} of portfolio`} />
-        <StatCard label="Direct" value={money(data.directInvestedInr)} />
         <StatCard label="Funds + ETFs" value={money(data.mutualFundInvestedInr + data.etfInvestedInr)} />
       </div>
       <Card>
