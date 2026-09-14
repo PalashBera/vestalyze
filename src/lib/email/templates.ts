@@ -71,32 +71,41 @@ function shell({
     <meta name="color-scheme" content="light" />
     <meta name="supported-color-schemes" content="light" />
     <title>${escapeHtml(heading)}</title>
+    <style>
+      @media only screen and (max-width: 620px) {
+        .email-outer { padding: 24px 12px !important; }
+        .email-pad { padding-left: 20px !important; padding-right: 20px !important; }
+        .email-body { padding: 24px 20px !important; }
+      }
+    </style>
   </head>
   <body style="margin:0;padding:0;background:${palette.page};">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${palette.page};">
       <tr>
-        <td align="center" style="padding:40px 16px;">
-          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;background:${palette.card};border:1px solid ${palette.border};border-radius:16px;overflow:hidden;">
+        <td class="email-outer" align="center" style="padding:40px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:${palette.card};border:1px solid ${palette.border};border-radius:16px;overflow:hidden;">
             <tr>
-              <td style="padding:24px 32px;border-bottom:1px solid ${palette.border};">
+              <td class="email-pad" style="padding:24px 32px;border-bottom:1px solid ${palette.border};">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td style="font-family:${fontStack};font-size:20px;font-weight:700;letter-spacing:-0.02em;color:${palette.text};">${APP_NAME}</td>
-                    <td align="right" style="font-family:${fontStack};font-size:11px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:${palette.muted};">${escapeHtml(badge)}</td>
+                    <td style="font-family:${fontStack};font-size:20px;line-height:1.3;font-weight:700;letter-spacing:-0.02em;color:${palette.text};">${APP_NAME}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-top:8px;font-family:${fontStack};font-size:11px;line-height:1.4;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:${palette.muted};">${escapeHtml(badge)}</td>
                   </tr>
                 </table>
               </td>
             </tr>
             <tr>
-              <td style="padding:32px;">
+              <td class="email-body" style="padding:32px;">
                 <h1 style="margin:0 0 12px;font-family:${fontStack};font-size:22px;line-height:1.3;font-weight:600;letter-spacing:-0.02em;color:${palette.text};">${escapeHtml(heading)}</h1>
                 <p style="margin:0 0 24px;font-family:${fontStack};font-size:15px;line-height:1.6;color:${palette.muted};">${intro}</p>
                 ${content}
               </td>
             </tr>
             <tr>
-              <td style="padding:20px 32px;background:${palette.subtle};border-top:1px solid ${palette.border};font-family:${fontStack};font-size:12px;line-height:1.6;color:${palette.muted};">
+              <td class="email-pad" style="padding:20px 32px;background:${palette.subtle};border-top:1px solid ${palette.border};font-family:${fontStack};font-size:12px;line-height:1.6;color:${palette.muted};">
                 ${footnote}
               </td>
             </tr>
