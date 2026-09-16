@@ -205,7 +205,7 @@ function AnalysisRows({
           return (
             <RecordListItem
               key={entry.id}
-              title={<CopySymbol symbol={entry.symbol} search />}
+              title={<CopySymbol symbol={entry.symbol} />}
               subtitle={
                 open ? (
                   <Badge variant="outline">In progress</Badge>
@@ -339,7 +339,7 @@ function AnalysisRows({
               return (
                 <TableRow key={entry.id}>
                   <TableCell>
-                    <CopySymbol symbol={entry.symbol} search />
+                    <CopySymbol symbol={entry.symbol} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {formatDateOnly(entry.buyDate)}
