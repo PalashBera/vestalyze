@@ -269,7 +269,7 @@ A lot the user actually holds: how much they put in, what kind of product, and (
 
 ## `investment_syncs`
 
-One row per sync attempt on a fund/ETF investment. The investment detail page lists recent runs (success / failed / running) and how many holdings were written.
+One row per sync or import attempt on a fund/ETF investment. The investment detail page lists recent runs (success / failed / running) and how many holdings were written.
 
 | Field               | Type                               | Purpose                                                                    |
 | ------------------- | ---------------------------------- | -------------------------------------------------------------------------- |

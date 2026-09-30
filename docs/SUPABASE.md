@@ -129,6 +129,7 @@ Handlers in `src/lib/api/supabase/handlers.ts` run for every `/api/v1` request. 
 | GET/POST         | `/investments`                                | `investments` select / insert                       |
 | GET/PATCH/DELETE | `/investments/:id`                            | Scoped by `user_id`                                 |
 | POST             | `/investments/:id/sync`                       | Scrape fund URL holdings, write `investment_syncs`  |
+| POST             | `/investments/:id/import`                     | Save holdings the browser parsed from the fund page |
 | GET              | `/investments/:id/syncs`                      | Owner sync history                                  |
 | GET              | `/funds`, `/funds/:id`, `/funds/:id/holdings` | Owner catalog                                       |
 | GET              | `/securities`, `/securities/:id`              | Owner security master                               |
@@ -159,7 +160,9 @@ Mutual funds and ETFs store a public **Fund URL**. Sync scrapes the page (SSRF-s
 
 Each run writes `investment_syncs` (`started_at`, `status`, `records_processed`). The investment’s `last_synced_at` updates on success.
 
-INDmoney pages may sit behind Cloudflare. If the fetch returns a challenge page, sync fails with a clear error instead of empty holdings.
+INDmoney pages sit behind Cloudflare. A normal browser gets the full page, but requests from hosting providers can be refused or challenged. When that happens (HTTP 401/403/429, `cf-mitigated: challenge`, or the “Just a moment” interstitial), sync fails with a message pointing to **Import page** instead of storing empty holdings. Vestalyze does not try to get past the challenge.
+
+**Import page** (investment detail) is the fallback. The user opens the fund page in their own browser, then uploads the saved `.html` or pastes the page source. `parseFundPage` in `src/lib/extract/holdings.ts` runs in the browser, shows a preview, and sends only the parsed rows to `POST /investments/:id/import`. The server re-checks every row with `normalizeHoldings` (same name and weight rules as scraping, at most 1,000 rows), then writes through the same path as sync, including an `investment_syncs` row. That parser module has no server imports so the browser can load it; the URL fetch lives in `src/lib/extract/scrape-fund.ts`.
 
 ---
 

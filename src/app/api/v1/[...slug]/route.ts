@@ -18,6 +18,7 @@ import {
   supabaseGetInvestment,
   supabaseGetSecurity,
   supabaseGetSettings,
+  supabaseImportHoldings,
   supabaseListAnalysis,
   supabaseListFunds,
   supabaseListInvestments,
@@ -165,6 +166,15 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
       return jsonError("Too many sync attempts. Try again later.", 429);
     }
     return jsonOk(await supabaseSyncInvestment(userId, investmentSyncMatch[1]));
+  }
+  const investmentImportMatch = path.match(/^investments\/([^/]+)\/import$/);
+  if (investmentImportMatch && method === "POST") {
+    const limit = consumeExtractAttempt(`import:${userId}`);
+    if (!limit.allowed) {
+      return jsonError("Too many imports. Try again later.", 429);
+    }
+    const body = (await request.json()) as { holdings?: unknown; holdingDate?: unknown };
+    return jsonOk(await supabaseImportHoldings(userId, investmentImportMatch[1], body));
   }
   const investmentSyncsMatch = path.match(/^investments\/([^/]+)\/syncs$/);
   if (investmentSyncsMatch && method === "GET") {

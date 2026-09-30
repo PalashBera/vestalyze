@@ -96,6 +96,18 @@ export const api = {
         sync: InvestmentSync;
         recordsProcessed: number;
       }>(`/investments/${id}/sync`, { method: "POST" }),
+    importHoldings: (
+      id: string,
+      input: { holdings: Array<{ name: string; allocationPercentage: number }>; holdingDate: string },
+    ) =>
+      request<{
+        investment: Investment;
+        sync: InvestmentSync;
+        recordsProcessed: number;
+      }>(`/investments/${id}/import`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     syncs: (id: string) =>
       request<{ syncs: InvestmentSync[] }>(`/investments/${id}/syncs`),
   },

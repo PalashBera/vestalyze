@@ -4,6 +4,7 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
+import { ImportHoldingsButton } from "@/components/import-holdings-dialog";
 import { InvestmentForm, SyncInvestmentButton } from "@/components/investment-form";
 import { PageHeader } from "@/components/page-header";
 import { useSettings } from "@/components/settings-provider";
@@ -187,6 +188,7 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
           <div className="flex flex-wrap gap-2">
             <InvestmentForm investment={investment} onSaved={() => void reload()} />
             <SyncInvestmentButton investment={investment} onSynced={() => reload()} labeled />
+            <ImportHoldingsButton investment={investment} onImported={() => reload()} />
             <AlertDialog>
               <AlertDialogTrigger render={<Button variant="destructive" />}>Delete</AlertDialogTrigger>
               <AlertDialogContent>
@@ -237,7 +239,7 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
           <CardHeader>
             <CardTitle>Underlying holdings</CardTitle>
             <CardDescription>
-              Stock split scraped from the fund URL
+              Stock split from the fund page
               {fund?.latestPortfolioDate ? ` · portfolio ${fund.latestPortfolioDate}` : ""}.
             </CardDescription>
           </CardHeader>
@@ -256,7 +258,7 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
             ) : (
               <EmptyState
                 title="No holdings yet"
-                description="Sync this investment to scrape the stock split from the fund URL."
+                description="Sync holdings to pull the stock split from the fund URL. If the site blocks sync, use Import page."
               />
             )}
           </CardContent>
@@ -266,7 +268,7 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
         <Card>
           <CardHeader>
             <CardTitle>Sync history</CardTitle>
-            <CardDescription>When each scrape started and how many stocks were stored.</CardDescription>
+            <CardDescription>Each sync or import, and how many stocks were stored.</CardDescription>
           </CardHeader>
           <CardContent>
             {syncs.length > 0 ? (
@@ -274,7 +276,7 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
             ) : (
               <EmptyState
                 title="No syncs yet"
-                description="Sync this investment to scrape the stock split and record it here."
+                description="Sync or import holdings to record a run here."
               />
             )}
           </CardContent>

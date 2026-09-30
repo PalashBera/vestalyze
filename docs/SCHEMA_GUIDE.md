@@ -251,7 +251,7 @@ No `units` column: amount plus allocation percentage is the whole look-through i
 
 ## `investment_syncs`
 
-An audit trail of scrape attempts. Its job is to explain a failure, not to store portfolio history.
+An audit trail of sync and import attempts. Its job is to explain a failure, not to store portfolio history.
 
 | Column              | Feature               | Written by                                              | Read by                                    | How to verify                                                                           |
 | ------------------- | --------------------- | ------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------- |

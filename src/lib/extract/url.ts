@@ -1,6 +1,11 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { isBotChallengePage } from "@/lib/extract/holdings";
 
+export const SYNC_BLOCKED_MESSAGE =
+  "This site blocked the automated sync. Open the fund page in your browser and use Import page instead.";
+
+const BLOCKED_STATUSES = new Set([401, 403, 429]);
 const MAX_URL_LENGTH = 2048;
 const MAX_BYTES = 3_000_000;
 const MAX_REDIRECTS = 3;
@@ -216,11 +221,12 @@ export async function fetchPublicHtml(rawUrl: string): Promise<{
 
     if (!response.ok) {
       const html = await readLimited(response).catch(() => "");
-      if (/just a moment|cf-browser-verification|challenge-platform/i.test(html)) {
-        throw Object.assign(
-          new Error("The fund page is protected. Open the URL once in a browser, then try sync again."),
-          { status: 400 },
-        );
+      if (
+        BLOCKED_STATUSES.has(response.status) ||
+        response.headers.get("cf-mitigated") === "challenge" ||
+        isBotChallengePage(html)
+      ) {
+        throw Object.assign(new Error(SYNC_BLOCKED_MESSAGE), { status: 400 });
       }
       throw Object.assign(new Error("The page could not be fetched."), { status: 400 });
     }

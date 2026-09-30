@@ -1,13 +1,9 @@
-import { extractFromHtml, fetchPublicHtml } from "@/lib/extract/url";
-
 export type ScrapedHolding = {
   name: string;
   allocationPercentage: number;
 };
 
-export type ScrapedFundHoldings = {
-  url: string;
-  finalUrl: string;
+export type FundPage = {
   title: string;
   holdingDate: string;
   holdings: ScrapedHolding[];
@@ -59,11 +55,11 @@ function roundAllocation(value: number): number {
 }
 
 function parsePercent(raw: string): number | null {
-  const match = raw.replace(/,/g, "").match(/(\d+(?:\.\d+)?)\s*%/);
-  if (!match) {
+  const match = raw.replace(/,/g, "").match(/([-−]\s*)?(\d+(?:\.\d+)?)\s*%/);
+  if (!match || match[1]) {
     return null;
   }
-  const value = Number(match[1]);
+  const value = Number(match[2]);
   if (!Number.isFinite(value) || value <= 0 || value > 100) {
     return null;
   }
@@ -321,7 +317,9 @@ function parseMfHoldingsBlock(value: unknown): ScrapedHolding[] {
           .find((column) => column && column.headerId === weightHeaderId);
         allocation = parseAllocationNumber(weightCol?.title);
       }
-      if (allocation == null) {
+      // With a weight column, a 0% weight means skip the row. Other columns are
+      // trends like "1M Change" and must never stand in for the weight.
+      if (allocation == null && weightHeaderId == null) {
         for (const column of columns) {
           const record = asRecord(column);
           if (!record || record.trait === "graph") {
@@ -440,7 +438,7 @@ function dedupe(rows: ScrapedHolding[]): ScrapedHolding[] {
   return [...seen.values()].sort((a, b) => b.allocationPercentage - a.allocationPercentage);
 }
 
-function findSeeMoreUrl(html: string, baseUrl: string): string {
+export function findSeeMoreUrl(html: string, baseUrl: string): string {
   const scoped = holdingsRegion(html) || html;
   const match = scoped.match(
     /<a[^>]+href=["']([^"']+)["'][^>]*>[\s\S]{0,120}?see\s+(?:more|all)|see\s+(?:more|all)[\s\S]{0,80}?<a[^>]+href=["']([^"']+)["']/i,
@@ -489,32 +487,39 @@ export function parseHoldingsHtml(html: string): ScrapedHolding[] {
   return dedupe(parseMarkdownHoldings(html));
 }
 
-export async function scrapeFundHoldings(rawUrl: string): Promise<ScrapedFundHoldings> {
-  const page = await fetchPublicHtml(rawUrl);
-  if (/just a moment|cf-browser-verification|challenge-platform/i.test(page.html)) {
-    throw Object.assign(
-      new Error("The fund page is protected. Open the URL once in a browser, then try sync again."),
-      { status: 400 },
+/**
+ * Cloudflare's interstitial, not a real page. Normal pages can still load
+ * `/cdn-cgi/challenge-platform/scripts/jsd`, so that path alone is not a signal.
+ */
+export function isBotChallengePage(html: string): boolean {
+  return /<title>\s*just a moment|_cf_chl_opt|cf-browser-verification/i.test(html);
+}
+
+/** Applies the same name and weight rules as scraping, for rows from any source. */
+export function normalizeHoldings(rows: unknown[]): ScrapedHolding[] {
+  const cleaned: ScrapedHolding[] = [];
+  for (const row of rows) {
+    const record = asRecord(row);
+    const holding = toHolding(
+      typeof record?.name === "string" ? record.name : "",
+      parseAllocationNumber(record?.allocationPercentage),
     );
+    if (holding) {
+      cleaned.push(holding);
+    }
   }
-  let holdings = parseHoldingsHtml(page.html);
-  const seeMoreUrl = findSeeMoreUrl(page.html, page.finalUrl);
-  if (seeMoreUrl && seeMoreUrl !== page.finalUrl) {
-    const extra = await fetchPublicHtml(seeMoreUrl);
-    holdings = dedupe([...holdings, ...parseHoldingsHtml(extra.html)]);
-  }
-  if (holdings.length === 0) {
-    throw Object.assign(
-      new Error("No stock split was found in the holdings section of that page."),
-      { status: 400 },
-    );
-  }
-  const meta = extractFromHtml(page.html);
+  return dedupe(cleaned);
+}
+
+function pageTitle(html: string): string {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return decodeHtml((match?.[1] ?? "").replace(/\s+/g, " ").trim()).slice(0, 300);
+}
+
+export function parseFundPage(html: string): FundPage {
   return {
-    url: rawUrl.trim(),
-    finalUrl: page.finalUrl,
-    title: meta.title,
-    holdingDate: parseEmbeddedHoldingDate(page.html) ?? parseHoldingDate(page.html),
-    holdings,
+    title: pageTitle(html),
+    holdingDate: parseEmbeddedHoldingDate(html) ?? parseHoldingDate(html),
+    holdings: parseHoldingsHtml(html),
   };
 }

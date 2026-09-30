@@ -23,7 +23,8 @@ import { sendAnalysisCsvEmail } from "@/lib/email/analysis";
 import { sendTradeCsvEmail } from "@/lib/email/trades";
 import { buildSecurityFromCompany, buildSecurityFromInput, normalizeTicker } from "@/lib/investments/security";
 import { isFundVehicle, normalizeSourceUrl } from "@/lib/investments/fund-url";
-import { scrapeFundHoldings } from "@/lib/extract/holdings";
+import { normalizeHoldings, type ScrapedHolding } from "@/lib/extract/holdings";
+import { scrapeFundHoldings } from "@/lib/extract/scrape-fund";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   mapAnalysis,
@@ -398,7 +399,35 @@ export async function supabaseUpdateInvestment(
   return mapInvestment(data);
 }
 
+const MAX_IMPORTED_HOLDINGS = 1000;
+
+type HoldingsSource = (sourceUrl: string) => Promise<{ holdingDate: string; holdings: ScrapedHolding[] }>;
+
 export async function supabaseSyncInvestment(userId: string, id: string) {
+  return replaceFundHoldings(userId, id, scrapeFundHoldings);
+}
+
+/**
+ * Holdings the user's browser read from the fund page, for sites that block
+ * the server. Rows are re-checked with the same rules as scraping.
+ */
+export async function supabaseImportHoldings(
+  userId: string,
+  id: string,
+  input: { holdings?: unknown; holdingDate?: unknown },
+) {
+  if (!Array.isArray(input.holdings) || input.holdings.length > MAX_IMPORTED_HOLDINGS) {
+    throwQueryError(`Import between 1 and ${MAX_IMPORTED_HOLDINGS} holdings.`, 400);
+  }
+  const holdings = normalizeHoldings(input.holdings);
+  if (holdings.length === 0) {
+    throwQueryError("No usable holdings were found on that page.", 400);
+  }
+  const holdingDate = cleanDate(input.holdingDate, "Portfolio date");
+  return replaceFundHoldings(userId, id, async () => ({ holdingDate, holdings }));
+}
+
+async function replaceFundHoldings(userId: string, id: string, load: HoldingsSource) {
   const detail = await supabaseGetInvestment(userId, id);
   const investment = detail.investment;
   if (!isFundVehicle(investment.type)) {
@@ -427,7 +456,7 @@ export async function supabaseSyncInvestment(userId: string, id: string) {
   }
 
   try {
-    const scraped = await scrapeFundHoldings(sourceUrl);
+    const scraped = await load(sourceUrl);
     const fund = await ensureSupabaseFund(userId, {
       name: investment.name,
       type: investment.type,
