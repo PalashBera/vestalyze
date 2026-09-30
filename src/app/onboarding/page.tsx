@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -54,12 +54,18 @@ function OnboardingForm() {
     await setCurrency(value as Currency);
   }
 
-  async function onAdd(formData: FormData) {
+  // onSubmit rather than the form `action` prop, so a failed save keeps what the
+  // user typed. The form is cleared only once the holding is saved.
+  async function onAdd(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const payload = payloadFromForm(new FormData(form), type, country);
     setPending(true);
     try {
-      await api.investments.create(payloadFromForm(formData, type, country));
+      await api.investments.create(payload);
       setAdded((count) => count + 1);
       toast.success("Holding saved");
+      form.reset();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to add holding");
     } finally {
@@ -116,7 +122,7 @@ function OnboardingForm() {
                 </div>
               </div>
             ) : (
-              <form className="flex flex-col gap-6" action={(formData) => void onAdd(formData)}>
+              <form className="flex flex-col gap-6" onSubmit={(event) => void onAdd(event)}>
                 <InvestmentFields
                   type={type}
                   country={country}

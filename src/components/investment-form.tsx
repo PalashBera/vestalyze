@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { PencilIcon, RefreshCwIcon } from "lucide-react";
 import { api } from "@/lib/api/client";
@@ -197,7 +197,11 @@ export function SyncInvestmentButton({
 
   return (
     <Button variant="outline" size={labeled ? "default" : "icon-sm"} disabled={pending} onClick={() => void sync()}>
-      {pending ? <Spinner data-icon={labeled ? "inline-start" : undefined} /> : <RefreshCwIcon />}
+      {pending ? (
+        <Spinner data-icon={labeled ? "inline-start" : undefined} />
+      ) : (
+        <RefreshCwIcon data-icon={labeled ? "inline-start" : undefined} />
+      )}
       {labeled ? "Sync holdings" : <span className="sr-only">Sync holdings</span>}
     </Button>
   );
@@ -206,9 +210,11 @@ export function SyncInvestmentButton({
 export function InvestmentForm({
   onSaved,
   investment,
+  labeled = false,
 }: {
   onSaved: () => void;
   investment?: Investment;
+  labeled?: boolean;
 }) {
   const editing = Boolean(investment);
   const [open, setOpen] = useState(false);
@@ -216,10 +222,13 @@ export function InvestmentForm({
   const [type, setType] = useState<InvestmentType>(investment?.type ?? "mutual_fund");
   const [country, setCountry] = useState<Country>(investment?.country ?? "IN");
 
-  async function onSubmit(formData: FormData) {
+  // onSubmit rather than the form `action` prop: React resets a form as soon as
+  // an action runs, which wipes what the user typed before the save finishes.
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const payload = payloadFromForm(new FormData(event.currentTarget), type, country);
     setPending(true);
     try {
-      const payload = payloadFromForm(formData, type, country);
       if (investment) {
         await api.investments.update(investment.id, payload);
         toast.success("Investment updated");
@@ -244,13 +253,16 @@ export function InvestmentForm({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant={editing ? "outline" : "default"} size={editing ? "icon-sm" : "default"} />
+          <Button
+            variant={editing ? "outline" : "default"}
+            size={editing && !labeled ? "icon-sm" : "default"}
+          />
         }
       >
         {editing ? (
           <>
-            <PencilIcon />
-            <span className="sr-only">Edit</span>
+            <PencilIcon data-icon={labeled ? "inline-start" : undefined} />
+            {labeled ? "Edit" : <span className="sr-only">Edit</span>}
           </>
         ) : (
           "Add investment"
@@ -268,7 +280,7 @@ export function InvestmentForm({
         <form
           key={`${investment?.id ?? "new"}-${open}`}
           className="flex flex-col gap-5"
-          action={(formData) => void onSubmit(formData)}
+          onSubmit={(event) => void onSubmit(event)}
         >
           <InvestmentFields
             type={type}

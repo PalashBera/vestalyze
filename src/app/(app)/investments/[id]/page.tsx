@@ -1,6 +1,7 @@
 "use client";
 
 import { use } from "react";
+import { Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
@@ -186,11 +187,14 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
         description={`${typeLabel(investment.type)} · ${countryLabel(investment.country)}`}
         actions={
           <div className="flex flex-wrap gap-2">
-            <InvestmentForm investment={investment} onSaved={() => void reload()} />
+            <InvestmentForm investment={investment} onSaved={() => void reload()} labeled />
             <SyncInvestmentButton investment={investment} onSynced={() => reload()} labeled />
             <ImportHoldingsButton investment={investment} onImported={() => reload()} />
             <AlertDialog>
-              <AlertDialogTrigger render={<Button variant="destructive" />}>Delete</AlertDialogTrigger>
+              <AlertDialogTrigger render={<Button variant="destructive" />}>
+                <Trash2Icon data-icon="inline-start" />
+                Delete
+              </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete this investment?</AlertDialogTitle>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { ChangePasswordDialog, DeleteAccountDialog, EditProfileDialog } from "@/components/account-dialogs";
 import { PageHeader } from "@/components/page-header";
@@ -25,24 +25,23 @@ const currencyItems = [
   { label: "USD", value: "USD" },
 ];
 
+function inputValue(value?: number): string {
+  return value === undefined ? "" : String(value);
+}
+
 export default function SettingsPage() {
   const { currency, setCurrency, fxRate, setFxRate, user, setTradeTargets } = useSettings();
-  const [fxInput, setFxInput] = useState("");
-  const [profitInput, setProfitInput] = useState("");
-  const [lossInput, setLossInput] = useState("");
+  // A draft is what the user typed; null shows the saved value. Drafts are
+  // cleared only after their save succeeds, so a reload never overwrites typing.
+  const [fxDraft, setFxDraft] = useState<string | null>(null);
+  const [profitDraft, setProfitDraft] = useState<string | null>(null);
+  const [lossDraft, setLossDraft] = useState<string | null>(null);
   const [savingFx, setSavingFx] = useState(false);
   const [savingTargets, setSavingTargets] = useState(false);
 
-  useEffect(() => {
-    if (fxRate) {
-      setFxInput(String(fxRate.rate));
-    }
-  }, [fxRate]);
-
-  useEffect(() => {
-    setProfitInput(user?.targetProfitPercentage === undefined ? "" : String(user.targetProfitPercentage));
-    setLossInput(user?.targetLossPercentage === undefined ? "" : String(user.targetLossPercentage));
-  }, [user?.targetProfitPercentage, user?.targetLossPercentage]);
+  const fxInput = fxDraft ?? inputValue(fxRate?.rate);
+  const profitInput = profitDraft ?? inputValue(user?.targetProfitPercentage);
+  const lossInput = lossDraft ?? inputValue(user?.targetLossPercentage);
 
   async function onCurrencyChange(value: string | null) {
     if (value !== "INR" && value !== "USD") {
@@ -57,6 +56,7 @@ export default function SettingsPage() {
     setSavingFx(true);
     try {
       await setFxRate(rate);
+      setFxDraft(null);
       toast.success("FX rate updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save FX rate");
@@ -71,6 +71,8 @@ export default function SettingsPage() {
     setSavingTargets(true);
     try {
       await setTradeTargets({ targetProfitPercentage: profit, targetLossPercentage: loss });
+      setProfitDraft(null);
+      setLossDraft(null);
       toast.success("Profit and loss targets updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save profit and loss targets");
@@ -123,7 +125,7 @@ export default function SettingsPage() {
                     max="500"
                     step="0.01"
                     value={fxInput}
-                    onChange={(event) => setFxInput(event.target.value)}
+                    onChange={(event) => setFxDraft(event.target.value)}
                     className="w-full sm:w-40"
                   />
                   <Button type="button" onClick={() => void onSaveFx()} disabled={savingFx}>
@@ -142,7 +144,7 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>Analysis targets</CardTitle>
             <CardDescription>
-              Used on Stock Analysis as a share of each row's target return, not of the buying price alone.
+              Used on Stock Analysis as a share of each row’s target return, not of the buying price alone.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -157,11 +159,11 @@ export default function SettingsPage() {
                   max="1000"
                   step="0.01"
                   value={profitInput}
-                  onChange={(event) => setProfitInput(event.target.value)}
+                  onChange={(event) => setProfitDraft(event.target.value)}
                   className="w-full sm:w-40"
                 />
                 <FieldDescription>
-                  Sell Target = buying price × (1 + this % × the row's target %). A ₹100 buy with a
+                  Sell Target = buying price × (1 + this % × the row’s target %). A ₹100 buy with a
                   20% target and 80% here is ₹116.
                 </FieldDescription>
               </Field>
@@ -175,11 +177,11 @@ export default function SettingsPage() {
                   max="100"
                   step="0.01"
                   value={lossInput}
-                  onChange={(event) => setLossInput(event.target.value)}
+                  onChange={(event) => setLossDraft(event.target.value)}
                   className="w-full sm:w-40"
                 />
                 <FieldDescription>
-                  Stop Loss = buying price × (1 − this % × the row's target %). A ₹100 buy with a
+                  Stop Loss = buying price × (1 − this % × the row’s target %). A ₹100 buy with a
                   20% target and 80% here is ₹84.
                 </FieldDescription>
               </Field>
