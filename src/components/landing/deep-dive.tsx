@@ -1,17 +1,17 @@
-import { GlobeIcon, LayersIcon, ShieldIcon, TargetIcon } from "lucide-react";
+import { IndianRupeeIcon, LayersIcon, ShieldIcon, TargetIcon } from "lucide-react";
 import { LandingProductShowcase } from "@/components/landing/product-showcase";
 import { SectionHeading } from "@/components/landing/section";
 
 const stats = [
   {
-    icon: GlobeIcon,
-    value: "2",
-    label: "Markets in one book",
-    body: "India and the United States, each kept in its own currency until you ask for a total.",
+    icon: IndianRupeeIcon,
+    value: "1",
+    label: "Currency to read",
+    body: "Every amount is in rupees, so a total never depends on an exchange rate.",
   },
   {
     icon: LayersIcon,
-    value: "3",
+    value: "2",
     label: "Instrument types",
     body: "Mutual funds and ETFs sit in the same ledger.",
   },

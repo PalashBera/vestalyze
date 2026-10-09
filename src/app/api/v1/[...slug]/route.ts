@@ -13,7 +13,6 @@ import {
   supabaseEmailTrades,
   supabaseExposure,
   supabaseExposureDetail,
-  supabaseFxRate,
   supabaseGetFund,
   supabaseGetInvestment,
   supabaseGetSecurity,
@@ -27,14 +26,12 @@ import {
   supabaseListTrades,
   supabaseLogin,
   supabaseLogout,
-  supabaseMarket,
   supabaseMe,
   supabaseOverlap,
   supabaseOverview,
   supabaseRegister,
   supabaseSyncInvestment,
   supabaseUpdateAnalysis,
-  supabaseUpdateFxRate,
   supabaseUpdateInvestment,
   supabaseUpdateTrade,
   supabaseUpdatePassword,
@@ -208,12 +205,6 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
   if (path === "portfolio/overview" && method === "GET") {
     return jsonOk(await supabaseOverview(userId));
   }
-  if (path === "portfolio/markets/IN" && method === "GET") {
-    return jsonOk(await supabaseMarket(userId, "IN"));
-  }
-  if (path === "portfolio/markets/US" && method === "GET") {
-    return jsonOk(await supabaseMarket(userId, "US"));
-  }
   if (path === "portfolio/exposure" && method === "GET") {
     return jsonOk({ exposures: await supabaseExposure(userId) });
   }
@@ -279,18 +270,10 @@ async function dispatch(request: NextRequest, method: string, slug: string[]) {
   }
   if (path === "settings" && method === "PATCH") {
     const body = (await request.json()) as {
-      displayCurrency?: "INR" | "USD";
       targetProfitPercentage?: number;
       targetLossPercentage?: number;
     };
     return jsonOk(await supabaseUpdateSettings(userId, body));
-  }
-  if (path === "fx/rate" && method === "GET") {
-    return jsonOk(await supabaseFxRate(userId));
-  }
-  if (path === "fx/rate" && method === "PATCH") {
-    const body = (await request.json()) as { rate?: number };
-    return jsonOk(await supabaseUpdateFxRate(userId, Number(body.rate)));
   }
 
   return jsonError("Not found", 404);

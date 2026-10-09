@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeftRightIcon,
-  ChartPieIcon,
-  LandmarkIcon,
   LayersIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -48,8 +46,6 @@ const groups = [
       { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
       { href: "/investments", label: "Investments", icon: WalletIcon },
       { href: "/exposure", label: "Stock Exposure", icon: LayersIcon },
-      { href: "/india", label: "India Market", icon: LandmarkIcon },
-      { href: "/us", label: "US Market", icon: ChartPieIcon },
       { href: "/overlap", label: "Fund Overlap", icon: TableIcon },
     ],
   },

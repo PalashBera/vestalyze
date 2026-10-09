@@ -1,29 +1,26 @@
-import type { Country, CreateInvestmentRequest, Security } from "@/lib/api/types";
-import { currencyForCountry } from "@/lib/finance/currency";
+import type { CreateInvestmentRequest, Security } from "@/lib/api/types";
 
 export function normalizeTicker(ticker: string): string {
   return ticker.trim().toUpperCase().replace(/[^A-Z0-9.]/g, "");
 }
 
-export function securityIdFor(userId: string, ticker: string, country: Country): string {
+export function securityIdFor(userId: string, ticker: string): string {
   const owner = userId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 32).toLowerCase();
   const code = normalizeTicker(ticker).toLowerCase().replace(/[^a-z0-9]/g, "");
-  return `sec-${owner}-${code}-${country.toLowerCase()}`;
+  return `sec-${owner}-${code}`;
 }
 
 export function companySlug(name: string): string {
   return name.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "").slice(0, 48) || "holding";
 }
 
-export function buildSecurityFromCompany(userId: string, name: string, country: Country): Security {
+export function buildSecurityFromCompany(userId: string, name: string): Security {
   const slug = companySlug(name);
   return {
-    id: securityIdFor(userId, slug, country),
+    id: securityIdFor(userId, slug),
     userId,
     standardizedName: name.trim(),
     ticker: slug.toUpperCase(),
-    country,
-    currency: currencyForCountry(country),
   };
 }
 
@@ -36,11 +33,9 @@ export function buildSecurityFromInput(input: CreateInvestmentRequest, userId: s
     return null;
   }
   return {
-    id: securityIdFor(userId, ticker, input.country),
+    id: securityIdFor(userId, ticker),
     userId,
     standardizedName: input.name.trim(),
     ticker,
-    country: input.country,
-    currency: currencyForCountry(input.country),
   };
 }

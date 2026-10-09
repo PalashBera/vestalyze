@@ -52,7 +52,7 @@ SUPABASE_ANON_KEY=
 In the Supabase SQL editor, run in order:
 
 1. [`supabase/schema.sql`](../supabase/schema.sql) — drops existing app tables, then creates tables, trigger, and owner-only RLS
-2. [`supabase/seed.sql`](../supabase/seed.sql) — notes only; FX defaults live on `profiles`
+2. [`supabase/seed.sql`](../supabase/seed.sql) — notes only; there is no seed data
 
 `schema.sql` wipes `profiles`, `securities`, `funds`, `fund_holdings`, `investments`, `investment_syncs`, `stock_trades`, and `stock_analysis`. It does not drop `auth.users`. After a reset, existing accounts need a new profile row (sign up again, or insert into `profiles`).
 
@@ -70,11 +70,11 @@ Every column also carries a Postgres comment, so the Supabase table editor expla
 
 | Table              | Columns                                                                                                                              | RLS                                 |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `profiles`         | `id`, `name`, `display_currency`, `fx_usd_inr`, `fx_as_of`, `target_profit_percentage`, `target_loss_percentage`, `created_at` | Own row only (select + update)      |
-| `securities`       | `id`, `user_id`, `standardized_name`, `ticker`, `country`                                                                            | Owner CRUD (`user_id = auth.uid()`) |
-| `funds`            | `id`, `user_id`, `name`, `type`, `country`, `latest_portfolio_date`, `source_url`                                                     | Owner CRUD                          |
+| `profiles`         | `id`, `name`, `target_profit_percentage`, `target_loss_percentage`, `created_at`                                                     | Own row only (select + update)      |
+| `securities`       | `id`, `user_id`, `standardized_name`, `ticker`                                                                                       | Owner CRUD (`user_id = auth.uid()`) |
+| `funds`            | `id`, `user_id`, `name`, `type`, `latest_portfolio_date`, `source_url`                                                                | Owner CRUD                          |
 | `fund_holdings`    | `id`, `user_id`, `fund_id`, `security_id`, `allocation_percentage`                                                                   | Owner CRUD                          |
-| `investments`      | `id`, `user_id`, `fund_id`, `security_id`, `name`, `type`, `country`, `invested_amount`, `source_url`, `last_synced_at`, `created_at` | Owner CRUD                          |
+| `investments`      | `id`, `user_id`, `fund_id`, `security_id`, `name`, `type`, `invested_amount`, `source_url`, `last_synced_at`, `created_at`            | Owner CRUD                          |
 | `investment_syncs` | `id`, `user_id`, `investment_id`, `started_at`, `status`, `records_processed`, `error_message`                                       | Owner CRUD                          |
 | `stock_trades`     | `id`, `user_id`, `symbol`, `buy_date`, `buy_price`, `quantity`, `sell_date`, `sell_price`, `created_at`                               | Owner CRUD                          |
 | `stock_analysis`   | `id`, `user_id`, `symbol`, `buy_date`, `buy_price`, `target_return_percentage`, `exited_date`, `created_at`                           | Owner CRUD                          |
@@ -85,16 +85,17 @@ Deliberately absent, and why:
 
 | Removed                                             | Reason                                                                                     |
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `currency` on securities, funds, investments        | Derived from `country` (`IN → INR`, `US → USD`) in `currencyForCountry`.                    |
+| `country` / `currency` on securities, funds, investments | Vestalyze is India-only. Every holding is Indian and every amount is INR.             |
+| `profiles.display_currency`, `fx_usd_inr`, `fx_as_of` | Nothing is converted, so there is no reporting currency or USD/INR rate to store.          |
 | `fund_holdings.holding_date`                        | Constant across a snapshot; the as-of date lives once on `funds.latest_portfolio_date`.     |
 | `funds.last_scraped_at`                             | Duplicated `investments.last_synced_at`, which is the value the UI shows.                   |
-| `securities.sector`, `investments.units`            | Exposure is company, market, and weight. Amount plus allocation % is the whole input.       |
+| `securities.sector`, `investments.units`            | Exposure is company and weight. Amount plus allocation % is the whole input.                |
 
-Every remaining column is read or written by the API. `profiles.display_currency` is the only currency column left, and it is a reporting preference rather than the currency of a position.
+Every remaining column is read or written by the API. There is no currency column anywhere.
 
-`profiles.id` references `auth.users(id)`. A trigger `handle_new_user` inserts a profile from `raw_user_meta_data.name` on signup, with default FX `87.25`.
+`profiles.id` references `auth.users(id)`. A trigger `handle_new_user` inserts a profile from `raw_user_meta_data.name` on signup.
 
-Securities are unique on `(user_id, ticker, country)`. Two accounts can own the same ticker without colliding.
+Securities are unique on `(user_id, ticker)`. Two accounts can own the same ticker without colliding.
 
 ---
 
@@ -140,8 +141,7 @@ Handlers in `src/lib/api/supabase/handlers.ts` run for every `/api/v1` request. 
 | GET/POST         | `/analysis`                                   | `stock_analysis` select / insert                    |
 | POST             | `/analysis/email`                             | Rebuild CSV from the caller’s analysis, email via Resend |
 | PATCH/DELETE     | `/analysis/:id`                               | Scoped by `user_id`                                 |
-| GET/PATCH        | `/settings`                                   | `profiles.display_currency`, `target_profit_percentage`, `target_loss_percentage` |
-| GET/PATCH        | `/fx/rate`                                    | `profiles.fx_usd_inr` / `fx_as_of`                  |
+| GET/PATCH        | `/settings`                                   | `profiles.target_profit_percentage`, `target_loss_percentage` |
 | DELETE           | `/auth/account`                               | Password check, then `delete_own_account()`         |
 
 Look-through formula (unchanged):

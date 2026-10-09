@@ -1,9 +1,9 @@
-import type { Currency, InvestmentType } from "@/lib/api/types";
+import type { InvestmentType } from "@/lib/api/types";
 
-export function formatMoney(amount: number, currency: Currency, compact = false): string {
-  return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
+export function formatMoney(amount: number, compact = false): string {
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency,
+    currency: "INR",
     maximumFractionDigits: compact ? 1 : 0,
     notation: compact ? "compact" : "standard",
   }).format(amount);
@@ -13,10 +13,10 @@ export function formatMoney(amount: number, currency: Currency, compact = false)
  * Per-share prices, where the app's usual whole-rupee rounding would hide the
  * paise the user actually entered.
  */
-export function formatPrice(amount: number, currency: Currency = "INR"): string {
-  return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
+export function formatPrice(amount: number): string {
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency,
+    currency: "INR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
@@ -39,10 +39,6 @@ export function typeLabel(type: InvestmentType): string {
     return "ETF";
   }
   return "Stock";
-}
-
-export function countryLabel(country: "IN" | "US"): string {
-  return country === "IN" ? "India" : "United States";
 }
 
 export function titleize(value: string): string {

@@ -2,21 +2,13 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import type { Currency, FxRate, User } from "@/lib/api/types";
+import type { User } from "@/lib/api/types";
 import { api } from "@/lib/api/client";
-import { convert } from "@/lib/finance/currency";
-import { formatMoney } from "@/lib/format";
 
 type SettingsContextValue = {
   user: User | null;
-  currency: Currency;
-  fxRate: FxRate | null;
-  setCurrency: (currency: Currency) => Promise<void>;
-  setFxRate: (rate: number) => Promise<void>;
   setTradeTargets: (input: { targetProfitPercentage: number; targetLossPercentage: number }) => Promise<void>;
   refreshUser: () => Promise<void>;
-  money: (amountInr: number, compact?: boolean) => string;
-  moneyNative: (amount: number, native: Currency, compact?: boolean) => string;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -24,13 +16,11 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
-  const [fxRate, setFxRate] = useState<FxRate | null>(null);
 
   async function refreshUser() {
     try {
-      const [{ user: nextUser }, rate] = await Promise.all([api.auth.me(), api.settings.fx()]);
+      const { user: nextUser } = await api.auth.me();
       setUser(nextUser);
-      setFxRate(rate);
     } catch {
       setUser(null);
     }
@@ -45,12 +35,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
     async function load() {
       try {
-        const [{ user: nextUser }, rate] = await Promise.all([api.auth.me(), api.settings.fx()]);
-        if (cancelled) {
-          return;
+        const { user: nextUser } = await api.auth.me();
+        if (!cancelled) {
+          setUser(nextUser);
         }
-        setUser(nextUser);
-        setFxRate(rate);
       } catch {
         if (!cancelled) {
           setUser(null);
@@ -63,16 +51,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [pathname]);
-
-  async function setCurrency(currency: Currency) {
-    const settings = await api.settings.update(currency);
-    setUser((current) => (current ? { ...current, displayCurrency: settings.displayCurrency } : current));
-  }
-
-  async function updateFxRate(rate: number) {
-    const next = await api.settings.updateFx(rate);
-    setFxRate(next);
-  }
 
   async function updateTradeTargets(input: { targetProfitPercentage: number; targetLossPercentage: number }) {
     const settings = await api.settings.updateTargets(input);
@@ -87,22 +65,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const value = useMemo<SettingsContextValue>(() => {
-    const displayCurrency = user?.displayCurrency ?? "INR";
-    const rate = fxRate?.rate ?? 87.25;
-    return {
+  const value = useMemo<SettingsContextValue>(
+    () => ({
       user,
-      currency: displayCurrency,
-      fxRate,
-      setCurrency,
-      setFxRate: updateFxRate,
       setTradeTargets: updateTradeTargets,
       refreshUser,
-      money: (amountInr, compact) =>
-        formatMoney(convert(amountInr, "INR", displayCurrency, rate), displayCurrency, compact),
-      moneyNative: (amount, native, compact) => formatMoney(amount, native, compact),
-    };
-  }, [user, fxRate]);
+    }),
+    [user],
+  );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }

@@ -32,8 +32,7 @@ export function LandingFooter() {
             <BrandLockup />
           </Link>
           <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-            Look through Indian mutual funds, ETFs, and US stocks to the companies you actually own — in one
-            private book.
+            Look through Indian mutual funds and ETFs to the companies you actually own — in one private book.
           </p>
         </div>
 

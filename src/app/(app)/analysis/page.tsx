@@ -64,7 +64,7 @@ type SortKey =
 type StatusFilter = "all" | "in-progress" | "exited";
 
 function price(amount: number): string {
-  return formatPrice(amount, "INR");
+  return formatPrice(amount);
 }
 
 function SortableHead({

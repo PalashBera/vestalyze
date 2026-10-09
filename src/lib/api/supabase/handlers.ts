@@ -2,20 +2,13 @@ import type {
   CreateInvestmentRequest,
   CreateStockAnalysisRequest,
   CreateStockTradeRequest,
-  Currency,
   LoginRequest,
   RegisterRequest,
   UpdateInvestmentRequest,
   User,
 } from "@/lib/api/types";
 import { isValidEmail, isValidPassword } from "@/lib/auth/password";
-import {
-  buildMarketDashboard,
-  buildOverlaps,
-  buildOverview,
-  calculateExposures,
-} from "@/lib/finance/exposure";
-import { getFxRate } from "@/lib/finance/currency";
+import { buildOverlaps, buildOverview, calculateExposures } from "@/lib/finance/exposure";
 import { buildAnalysisCsv, analysisCsvFilename } from "@/lib/finance/analysis-csv";
 import { buildTradeCsv, tradeCsvFilename } from "@/lib/finance/trade-csv";
 import { analysisIsOpen, tradeTotals } from "@/lib/finance/trades";
@@ -144,7 +137,6 @@ async function ensureSupabaseFund(
   input: {
     name: string;
     type: "mutual_fund" | "etf";
-    country: "IN" | "US";
     sourceUrl: string;
   },
 ) {
@@ -166,7 +158,6 @@ async function ensureSupabaseFund(
       user_id: userId,
       name: input.name,
       type: input.type,
-      country: input.country,
       latest_portfolio_date: now.slice(0, 10),
       source_url: input.sourceUrl,
     })
@@ -178,32 +169,17 @@ async function ensureSupabaseFund(
   return mapFund(data);
 }
 
-async function fxRate(userId: string) {
-  const supabase = await client();
-  const { data } = await supabase
-    .from("profiles")
-    .select("fx_usd_inr, fx_as_of")
-    .eq("id", userId)
-    .maybeSingle();
-  if (!data) {
-    return getFxRate();
-  }
-  return getFxRate({ rate: Number(data.fx_usd_inr), asOf: data.fx_as_of });
-}
-
 async function exposuresFor(userId: string) {
-  const [{ funds, holdings, securities }, investments, fx] = await Promise.all([
+  const [{ funds, holdings, securities }, investments] = await Promise.all([
     catalog(userId),
     listInvestments(userId),
-    fxRate(userId),
   ]);
   return {
     investments,
     funds,
     holdings,
     securities,
-    fx,
-    exposures: calculateExposures(investments, holdings, securities, funds, fx.rate),
+    exposures: calculateExposures(investments, holdings, securities, funds),
   };
 }
 
@@ -258,9 +234,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
   if (!["mutual_fund", "etf"].includes(input.type)) {
     throwQueryError("Invalid investment type.", 400);
   }
-  if (!["IN", "US"].includes(input.country)) {
-    throwQueryError("Invalid country.", 400);
-  }
   if (!Number.isFinite(input.investedAmount) || input.investedAmount <= 0) {
     throwQueryError("Invested amount must be greater than zero.", 400);
   }
@@ -288,7 +261,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
       await ensureSupabaseFund(userId, {
         name: input.name.trim(),
         type: input.type,
-        country: input.country,
         sourceUrl,
       })
     ).id;
@@ -300,7 +272,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
       .select("id")
       .eq("user_id", userId)
       .eq("ticker", security.ticker)
-      .eq("country", security.country)
       .maybeSingle();
     if (existing) {
       security.id = existing.id;
@@ -310,7 +281,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
         user_id: userId,
         standardized_name: security.standardizedName,
         ticker: security.ticker,
-        country: security.country,
       });
       if (securityError) {
         throwQueryError("Unable to save the stock details.", 400);
@@ -335,7 +305,6 @@ export async function supabaseCreateInvestment(userId: string, input: CreateInve
       security_id: security?.id ?? input.securityId ?? null,
       name: input.name.trim(),
       type: input.type,
-      country: input.country,
       invested_amount: input.investedAmount,
       source_url: sourceUrl || null,
     })
@@ -380,7 +349,6 @@ export async function supabaseUpdateInvestment(
         await ensureSupabaseFund(userId, {
           name: patch.name ?? current.investment.name,
           type: current.investment.type,
-          country: current.investment.country,
           sourceUrl,
         })
       ).id;
@@ -460,7 +428,6 @@ async function replaceFundHoldings(userId: string, id: string, load: HoldingsSou
     const fund = await ensureSupabaseFund(userId, {
       name: investment.name,
       type: investment.type,
-      country: investment.country,
       sourceUrl,
     });
 
@@ -468,13 +435,12 @@ async function replaceFundHoldings(userId: string, id: string, load: HoldingsSou
 
     const holdingRows = [];
     for (const item of scraped.holdings) {
-      const security = buildSecurityFromCompany(userId, item.name, investment.country);
+      const security = buildSecurityFromCompany(userId, item.name);
       const { data: existing } = await supabase
         .from("securities")
         .select("id")
         .eq("user_id", userId)
         .eq("ticker", security.ticker)
-        .eq("country", security.country)
         .maybeSingle();
       const securityId = existing?.id ?? security.id;
       if (!existing) {
@@ -483,7 +449,6 @@ async function replaceFundHoldings(userId: string, id: string, load: HoldingsSou
           user_id: userId,
           standardized_name: security.standardizedName,
           ticker: security.ticker,
-          country: security.country,
         });
         if (securityError) {
           throwQueryError("Unable to save a holding company.", 400);
@@ -617,13 +582,8 @@ export async function supabaseGetSecurity(userId: string, id: string) {
 }
 
 export async function supabaseOverview(userId: string) {
-  const { investments, exposures, fx } = await exposuresFor(userId);
-  return buildOverview(investments, exposures, fx);
-}
-
-export async function supabaseMarket(userId: string, country: "IN" | "US") {
-  const { investments, exposures, fx } = await exposuresFor(userId);
-  return buildMarketDashboard(country, investments, exposures, fx.rate);
+  const { investments, exposures } = await exposuresFor(userId);
+  return buildOverview(investments, exposures);
 }
 
 export async function supabaseExposure(userId: string) {
@@ -640,15 +600,12 @@ export async function supabaseExposureDetail(userId: string, securityId: string)
 
 export async function supabaseAllocation(userId: string) {
   const overview = await supabaseOverview(userId);
-  const rate = overview.fxRate.rate;
   return {
-    market: overview.marketAllocation,
     type: overview.typeAllocation,
     stocks: overview.topHoldings.map((item) => ({
       key: item.security.id,
       label: item.security.standardizedName,
       amountInr: item.totalInvestedInr,
-      amountUsd: item.totalInvestedInr / rate,
       percentage: item.portfolioPercentage,
     })),
   };
@@ -773,7 +730,6 @@ export async function supabaseDeleteAccount(userId: string, password: string) {
 export async function supabaseGetSettings(userId: string) {
   const user = await supabaseMe(userId);
   return {
-    displayCurrency: user.displayCurrency,
     targetProfitPercentage: user.targetProfitPercentage,
     targetLossPercentage: user.targetLossPercentage,
   };
@@ -782,23 +738,15 @@ export async function supabaseGetSettings(userId: string) {
 export async function supabaseUpdateSettings(
   userId: string,
   input: {
-    displayCurrency?: Currency;
     targetProfitPercentage?: number;
     targetLossPercentage?: number;
   },
 ) {
   const patch: {
-    display_currency?: Currency;
     target_profit_percentage?: number;
     target_loss_percentage?: number;
   } = {};
 
-  if (input.displayCurrency !== undefined) {
-    if (input.displayCurrency !== "INR" && input.displayCurrency !== "USD") {
-      throwQueryError("Unsupported display currency.", 400);
-    }
-    patch.display_currency = input.displayCurrency;
-  }
   if (input.targetProfitPercentage !== undefined) {
     const profit = cleanAmount(input.targetProfitPercentage, "Target profit");
     if (profit > 1000) {
@@ -823,32 +771,9 @@ export async function supabaseUpdateSettings(
     throwQueryError("Unauthorized", 401);
   }
   return {
-    displayCurrency: data.display_currency,
     targetProfitPercentage: data.target_profit_percentage === null ? undefined : Number(data.target_profit_percentage),
     targetLossPercentage: data.target_loss_percentage === null ? undefined : Number(data.target_loss_percentage),
   };
-}
-
-export async function supabaseFxRate(userId: string) {
-  return fxRate(userId);
-}
-
-export async function supabaseUpdateFxRate(userId: string, rate: number) {
-  if (!Number.isFinite(rate) || rate <= 0 || rate > 500) {
-    throwQueryError("Enter a USD/INR rate between 0 and 500.", 400);
-  }
-  const supabase = await client();
-  const asOf = new Date().toISOString().slice(0, 10);
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({ fx_usd_inr: rate, fx_as_of: asOf })
-    .eq("id", userId)
-    .select("fx_usd_inr, fx_as_of")
-    .maybeSingle();
-  if (error || !data) {
-    throwQueryError("Unauthorized", 401);
-  }
-  return getFxRate({ rate: Number(data.fx_usd_inr), asOf: data.fx_as_of });
 }
 
 // Stock Trades and Stock Analysis ------------------------------------------

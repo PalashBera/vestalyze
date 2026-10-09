@@ -7,9 +7,6 @@ export type Database = {
         Row: {
           id: string;
           name: string;
-          display_currency: "INR" | "USD";
-          fx_usd_inr: number;
-          fx_as_of: string;
           target_profit_percentage: number | null;
           target_loss_percentage: number | null;
           created_at: string;
@@ -17,18 +14,12 @@ export type Database = {
         Insert: {
           id: string;
           name: string;
-          display_currency?: "INR" | "USD";
-          fx_usd_inr?: number;
-          fx_as_of?: string;
           target_profit_percentage?: number | null;
           target_loss_percentage?: number | null;
           created_at?: string;
         };
         Update: {
           name?: string;
-          display_currency?: "INR" | "USD";
-          fx_usd_inr?: number;
-          fx_as_of?: string;
           target_profit_percentage?: number | null;
           target_loss_percentage?: number | null;
         };
@@ -40,7 +31,6 @@ export type Database = {
           user_id: string;
           standardized_name: string;
           ticker: string;
-          country: "IN" | "US";
         };
         Insert: Database["public"]["Tables"]["securities"]["Row"];
         Update: Partial<Database["public"]["Tables"]["securities"]["Row"]>;
@@ -52,7 +42,6 @@ export type Database = {
           user_id: string;
           name: string;
           type: "mutual_fund" | "etf";
-          country: "IN" | "US";
           latest_portfolio_date: string;
           source_url: string;
         };
@@ -80,7 +69,6 @@ export type Database = {
           security_id: string | null;
           name: string;
           type: "mutual_fund" | "etf" | "stock";
-          country: "IN" | "US";
           invested_amount: number;
           source_url: string | null;
           last_synced_at: string | null;
@@ -93,7 +81,6 @@ export type Database = {
           security_id?: string | null;
           name: string;
           type: "mutual_fund" | "etf" | "stock";
-          country: "IN" | "US";
           invested_amount: number;
           source_url?: string | null;
           last_synced_at?: string | null;

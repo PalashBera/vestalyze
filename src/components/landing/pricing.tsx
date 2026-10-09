@@ -15,7 +15,7 @@ const plans = [
     cta: { label: "Create a free account", href: "/register", variant: "secondary" as const },
     featuresLabel: "What's included",
     features: [
-      "Unlimited holdings across India and the US",
+      "Unlimited Indian mutual funds and ETFs",
       "Look-through for mutual funds and ETFs",
       "Company exposure with portfolio weight",
       "Fund-to-fund overlap scoring",

@@ -9,61 +9,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import type { Currency } from "@/lib/api/types";
-
-const currencyItems = [
-  { label: "INR", value: "INR" },
-  { label: "USD", value: "USD" },
-];
 
 function inputValue(value?: number): string {
   return value === undefined ? "" : String(value);
 }
 
 export default function SettingsPage() {
-  const { currency, setCurrency, fxRate, setFxRate, user, setTradeTargets } = useSettings();
+  const { user, setTradeTargets } = useSettings();
   // A draft is what the user typed; null shows the saved value. Drafts are
   // cleared only after their save succeeds, so a reload never overwrites typing.
-  const [fxDraft, setFxDraft] = useState<string | null>(null);
   const [profitDraft, setProfitDraft] = useState<string | null>(null);
   const [lossDraft, setLossDraft] = useState<string | null>(null);
-  const [savingFx, setSavingFx] = useState(false);
   const [savingTargets, setSavingTargets] = useState(false);
 
-  const fxInput = fxDraft ?? inputValue(fxRate?.rate);
   const profitInput = profitDraft ?? inputValue(user?.targetProfitPercentage);
   const lossInput = lossDraft ?? inputValue(user?.targetLossPercentage);
-
-  async function onCurrencyChange(value: string | null) {
-    if (value !== "INR" && value !== "USD") {
-      return;
-    }
-    await setCurrency(value as Currency);
-    toast.success("Display currency updated");
-  }
-
-  async function onSaveFx() {
-    const rate = Number(fxInput);
-    setSavingFx(true);
-    try {
-      await setFxRate(rate);
-      setFxDraft(null);
-      toast.success("FX rate updated");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to save FX rate");
-    } finally {
-      setSavingFx(false);
-    }
-  }
 
   async function onSaveTargets() {
     const profit = Number(profitInput);
@@ -83,63 +44,8 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Settings"
-        description="Display currency, USD/INR rate, analysis targets, and account details."
-      />
+      <PageHeader title="Settings" description="Analysis targets and account details." />
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Reporting</CardTitle>
-            <CardDescription>
-              Indian amounts stay in INR. US amounts stay in USD. Consolidated views convert using your FX rate.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <FieldGroup>
-              <Field>
-                <FieldLabel>Display currency</FieldLabel>
-                <Select items={currencyItems} value={currency} onValueChange={onCurrencyChange}>
-                  <SelectTrigger className="w-full sm:w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {currencyItems.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="fxRate">USD / INR rate</FieldLabel>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Input
-                    id="fxRate"
-                    type="number"
-                    inputMode="decimal"
-                    min="0.01"
-                    max="500"
-                    step="0.01"
-                    value={fxInput}
-                    onChange={(event) => setFxDraft(event.target.value)}
-                    className="w-full sm:w-40"
-                  />
-                  <Button type="button" onClick={() => void onSaveFx()} disabled={savingFx}>
-                    {savingFx ? <Spinner data-icon="inline-start" /> : null}
-                    Save rate
-                  </Button>
-                </div>
-                <FieldDescription>
-                  Used for India vs US totals. Last set {fxRate?.asOf ?? "—"}.
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
-          </CardContent>
-        </Card>
         <Card>
           <CardHeader>
             <CardTitle>Analysis targets</CardTitle>

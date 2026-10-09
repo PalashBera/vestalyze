@@ -15,13 +15,13 @@ Use this when you change the schema, review a PR that touches data, or want to c
 Every column below is justified against these. A column that breaks one of them should be removed, not documented.
 
 1. **Owner-scoped.** Every table carries `user_id` (or is keyed by it) so an RLS policy can filter without a join. This is the one denormalisation the schema allows, and it is deliberate.
-2. **Nothing derivable is stored.** If a value can be computed from another column, it is computed. Currency comes from country. Exposure comes from amount times weight. Neither is persisted.
+2. **Nothing derivable is stored.** If a value can be computed from another column, it is computed. Exposure comes from amount times weight and is never persisted. Vestalyze is India-only, so every amount is in rupees: there is no country, currency, or exchange-rate column to keep in sync.
 3. **Latest snapshot, not history.** `fund_holdings` is replaced wholesale on each sync. The only history the product keeps is `investment_syncs`, and that is an audit log, not portfolio history.
-4. **One home for money in the portfolio book.** `investments.invested_amount` is the only money column feeding the dashboard, market, exposure, and overlap screens. Every figure on those screens traces back to it. `stock_trades` and `stock_analysis` sit outside that book — see below.
+4. **One home for money in the portfolio book.** `investments.invested_amount` is the only money column feeding the dashboard, exposure, and overlap screens. Every figure on those screens traces back to it. `stock_trades` and `stock_analysis` sit outside that book — see below.
 
 ### The two standalone tables
 
-`stock_trades` and `stock_analysis` are a trade journal and a price-target watchlist. They follow rules 1 and 2 like everything else, but they are deliberately **not** part of the portfolio book: no handler joins them to `investments`, and nothing they contain reaches the dashboard, market, exposure, or overlap screens. That separation is the point — a closed trade is not a holding, and a price target is not an amount invested. Keep it that way, or the totals on `/dashboard` stop meaning one thing.
+`stock_trades` and `stock_analysis` are a trade journal and a price-target watchlist. They follow rules 1 and 2 like everything else, but they are deliberately **not** part of the portfolio book: no handler joins them to `investments`, and nothing they contain reaches the dashboard, exposure, or overlap screens. That separation is the point — a closed trade is not a holding, and a price target is not an amount invested. Keep it that way, or the totals on `/dashboard` stop meaning one thing.
 
 ```sql
 -- Nothing in the portfolio path may reference the journal tables.
@@ -55,19 +55,19 @@ where n.nspname = 'public' and c.relkind = 'r'
 group by 1, 2;
 -- Expect: relrowsecurity true everywhere; 4 policies per table, 2 on profiles.
 
--- Rule 2: no table may reintroduce a currency column.
+-- Rule 2: India-only. No table may reintroduce a country, currency, or FX column.
 select table_name, column_name
 from information_schema.columns
-where table_schema = 'public' and column_name = 'currency';
--- Expect: zero rows. Only profiles.display_currency exists, and it is a
--- reporting preference, not the currency of a position.
+where table_schema = 'public'
+  and column_name in ('country', 'currency', 'display_currency', 'fx_usd_inr', 'fx_as_of');
+-- Expect: zero rows.
 
 -- Rule 4: invested_amount is the only money column in the portfolio book.
 select table_name, column_name
 from information_schema.columns
 where table_schema = 'public' and data_type = 'numeric'
   and table_name not in ('stock_trades', 'stock_analysis');
--- Expect: profiles.fx_usd_inr, profiles.target_profit_percentage,
+-- Expect: profiles.target_profit_percentage,
 -- profiles.target_loss_percentage, investments.invested_amount,
 -- fund_holdings.allocation_percentage. Nothing else.
 -- The journal tables carry their own prices and are excluded on purpose.
@@ -98,13 +98,12 @@ Start here to know what a change can affect.
 | Add / edit investment | `/investments`                        | `funds`, `securities`                                             | `investments`, `funds`, `securities`                                      |
 | Sync fund holdings    | `/investments/[id]`                   | `investments`, `funds`                                            | `fund_holdings`, `securities`, `funds`, `investments`, `investment_syncs` |
 | Sync history          | `/investments/[id]`                   | `investment_syncs`                                                | —                                                                         |
-| Dashboard totals      | `/dashboard`                          | `investments`, `fund_holdings`, `funds`, `securities`, `profiles` | —                                                                         |
+| Dashboard totals      | `/dashboard`                          | `investments`, `fund_holdings`, `funds`, `securities`             | —                                                                         |
 | Company exposure      | `/exposure`, `/exposure/[securityId]` | `investments`, `fund_holdings`, `securities`                      | —                                                                         |
 | Fund overlap          | `/overlap`                            | `investments`, `fund_holdings`, `funds`, `securities`             | —                                                                         |
-| India / US views      | `/india`, `/us`                       | `investments`, `fund_holdings`, `securities`, `profiles`          | —                                                                         |
 | Stock trades          | `/trades`                             | `stock_trades`                                                    | `stock_trades`                                                            |
 | Stock analysis        | `/analysis`                           | `stock_analysis`                                                  | `stock_analysis`                                                          |
-| Settings and FX       | `/settings`                           | `profiles`                                                        | `profiles`                                                                |
+| Settings              | `/settings`                           | `profiles`                                                        | `profiles`                                                                |
 | Delete account        | `/settings`                           | —                                                                 | all, via `delete_own_account()`                                           |
 
 The read path is always the same: `src/app/api/v1/[...slug]/route.ts` → `src/lib/api/supabase/handlers.ts` → `src/lib/api/supabase/mappers.ts` → `src/lib/finance/exposure.ts`. No screen queries Supabase directly.
@@ -119,39 +118,26 @@ One row per account, created by the `handle_new_user` trigger. Holds settings on
 | ------------------ | -------------------------------------- | ----------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `id`               | All                                    | `handle_new_user()` trigger on signup           | Every handler, as the RLS key                 | Sign up, then `select count(*) from profiles` — exactly one new row whose id matches the new `auth.users` row. |
 | `name`             | Sidebar, Settings, onboarding greeting | `supabaseUpdateProfile` (`PATCH /auth/profile`) | `mapUser` → `GET /auth/me`                    | Change the name in Edit profile; the sidebar updates without a reload.                                         |
-| `display_currency` | Consolidated totals                    | `supabaseUpdateSettings` (`PATCH /settings`)    | `buildOverview` in `exposure.ts`              | Switch INR to USD in Settings; dashboard totals reprice, per-market native amounts do not.                     |
-| `fx_usd_inr`       | India vs US combined totals            | `supabaseUpdateFxRate` (`PATCH /fx/rate`)       | `fxRate()` in `handlers.ts`, then `convert()` | Change the rate; the dashboard FX card and any cross-currency total move together.                             |
-| `fx_as_of`         | Staleness hint next to the rate        | Same as `fx_usd_inr`, always written together   | Dashboard FX card hint, Settings "Last set"   | Save a new rate; the date becomes today. On a brand new signup it is the signup date, not a hardcoded one.     |
 | `target_profit_percentage` | Stock Analysis Sell Target       | `supabaseUpdateSettings` (`PATCH /settings`)    | `/analysis` sell-target column                | Save 80 in Settings; a ₹100 buy with a 20% target shows Sell Target ₹116.00.                                   |
 | `target_loss_percentage`   | Stock Analysis Stop Loss         | Same as `target_profit_percentage`              | `/analysis` stop-loss column                  | Save 80 in Settings; that same row shows Stop Loss ₹84.00.                                                     |
 | `created_at`       | Account age                            | Column default                                  | `mapUser`                                     | `select created_at from profiles` is close to the `auth.users` timestamp.                                      |
 
 Only `select` and `update` policies exist. There is deliberately no insert policy: the trigger creates the row, and the client must never be able to forge one.
 
-> **Verify `fx_as_of` is not frozen.** This column was previously created with a literal default, so every new account inherited one stale date. Check the default is an expression:
->
-> ```sql
-> select pg_get_expr(d.adbin, d.adrelid)
-> from pg_attrdef d join pg_attribute a on a.attrelid = d.adrelid and a.attnum = d.adnum
-> where a.attname = 'fx_as_of';
-> -- Expect: (timezone('utc'::text, now()))::date, never a date literal.
-> ```
-
 ---
 
 ## `securities`
 
-A company, scoped to one user. Created either when a direct stock is added or while parsing a fund's holdings. Two users tracking Apple get two rows; that is intentional so one person's scrape can never leak into another's book.
+A company, scoped to one user. Created either when a direct stock is added or while parsing a fund's holdings. Two users tracking HDFC Bank get two rows; that is intentional so one person's scrape can never leak into another's book.
 
 | Column              | Feature                                | Written by                                                                                 | Read by                                  | How to verify                                                                                |
 | ------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `id`                | Company drill-down URL                 | `buildSecurityFromInput` / `buildSecurityFromCompany` in `src/lib/investments/security.ts` | `/exposure/[securityId]`                 | The id is deterministic. Sync the same fund twice and the row count does not grow.           |
 | `user_id`           | Isolation                              | Same as above                                                                              | RLS                                      | Query as another user; you get zero rows.                                                    |
 | `standardized_name` | Label on every exposure screen         | Stock: what the user typed. Holding: the cleaned name from the scraper                     | Exposure table, company page             | Add " hdfc bank " as a stock; the stored name is trimmed and shown consistently.             |
-| `ticker`            | Deduplication                          | `normalizeTicker` (uppercased, symbols stripped)                                           | The dedupe lookup before every insert    | Add `hdfcbank` then `HDFCBANK` in the same market; the second reuses the first row.          |
-| `country`           | Market split, and the derived currency | Copied from the parent investment                                                          | `currencyForCountry`, India and US pages | Same ticker in IN and US stays two rows, because uniqueness is `(user_id, ticker, country)`. |
+| `ticker`            | Deduplication                          | `normalizeTicker` (uppercased, symbols stripped)                                           | The dedupe lookup before every insert    | Add `hdfcbank` then `HDFCBANK`; the second reuses the first row. Uniqueness is `(user_id, ticker)`. |
 
-No `currency` column: it is `country === 'IN' ? 'INR' : 'USD'`, applied in `mapSecurity`. No `sector` column: exposure is by company, market, and weight, never by industry tag.
+No `country` or `currency` column: every company is Indian and every amount is INR. No `sector` column: exposure is by company and weight, never by industry tag.
 
 ---
 
@@ -165,7 +151,6 @@ A mutual fund or ETF whose holdings have been scraped, deduplicated per user by 
 | `user_id`               | Isolation                                       | `ensureSupabaseFund`                           | RLS                                            | As above.                                                                                        |
 | `name`                  | Fund label in overlap                           | Copied from the investment name on first sync  | `/overlap`                                     | Rename the investment; the fund keeps its original name, which is expected — the fund is shared. |
 | `type`                  | Distinguishing a fund from an ETF               | Copied from the investment type                | `/overlap`                                     | A `stock` investment must never create a fund row.                                               |
-| `country`               | Market of the product, and its derived currency | Copied from the investment                     | `currencyForCountry`                           | —                                                                                                |
 | `latest_portfolio_date` | "Portfolio as of" on the investment page        | Set from the scraped holding date on each sync | `/investments/[id]`                            | Sync a fund; the date matches the as-of date printed on the source page.                         |
 | `source_url`            | Scrape target and dedupe key                    | `ensureSupabaseFund`, refreshed on each sync   | The sync path                                  | Add two investments with the same URL; `select count(*) from funds` increases by one, not two.   |
 
@@ -225,8 +210,7 @@ What the user bought. The only table with a money amount, and the root of every 
 | `security_id`     | Direct stock link                      | Set on create for stocks only                      | `calculateExposures`                                          | Exactly one of `fund_id` / `security_id` is set in practice; a stock never has both.                                             |
 | `name`            | List and detail title                  | What the user typed, trimmed                       | Investments list, detail                                      | Also seeds `funds.name` the first time a fund is created.                                                                        |
 | `type`            | Whether look-through applies           | The form's type selector                           | Sync button visibility, exposure branching                    | A `stock` must not show a Fund URL field or a Sync button.                                                                       |
-| `country`         | Market views, and the derived currency | The form's country selector                        | India / US pages, `currencyForCountry`                        | Add an IN investment; it appears on `/india` and not on `/us`.                                                                   |
-| `invested_amount` | Every figure in the product            | The form                                           | `calculateExposures`, `buildOverview`, `buildMarketDashboard` | Change the amount; every exposure for that fund's companies moves proportionally. A check constraint rejects zero and negatives. |
+| `invested_amount` | Every figure in the product, in rupees | The form                                           | `calculateExposures`, `buildOverview`                         | Change the amount; every exposure for that fund's companies moves proportionally. A check constraint rejects zero and negatives. |
 | `source_url`      | Scrape target                          | The form, normalised by `normalizeSourceUrl`       | The sync path                                                 | Required for funds and ETFs, rejected as missing with a 400. Null for stocks.                                                    |
 | `last_synced_at`  | "Last sync" column                     | Set on each successful sync                        | Investments list and detail                                   | Null until the first successful sync. Stocks show a dash rather than a date.                                                     |
 | `created_at`      | List ordering                          | Column default                                     | Investments list                                              | —                                                                                                                                |

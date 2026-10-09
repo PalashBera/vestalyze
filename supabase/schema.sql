@@ -4,8 +4,9 @@
 --
 -- Design rules enforced here:
 --   1. Every nested table carries user_id so RLS filters without a join.
---   2. Nothing derivable is stored. Currency is a function of country, and
---      effective exposure is computed at read time, never persisted.
+--   2. Nothing derivable is stored. Effective exposure is computed at read
+--      time, never persisted. Vestalyze is India-only, so every amount is INR
+--      and there is no country, currency, or exchange-rate column.
 --   3. fund_holdings holds the latest snapshot only. A sync replaces the rows
 --      for that fund, so there is no per-row history to date-stamp.
 --   4. In the portfolio book, investments.invested_amount is the only money
@@ -33,8 +34,6 @@ drop type if exists public.country_code;
 
 create extension if not exists pgcrypto;
 
-create type public.country_code as enum ('IN', 'US');
-create type public.currency_code as enum ('INR', 'USD');
 create type public.investment_type as enum ('mutual_fund', 'etf', 'stock');
 create type public.fund_type as enum ('mutual_fund', 'etf');
 create type public.scrape_status as enum ('success', 'failed', 'running');
@@ -45,9 +44,6 @@ create type public.scrape_status as enum ('success', 'failed', 'running');
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   name text not null check (char_length(name) between 1 and 80),
-  display_currency public.currency_code not null default 'INR',
-  fx_usd_inr numeric not null default 87.25 check (fx_usd_inr > 0),
-  fx_as_of date not null default (timezone('utc', now()))::date,
   target_profit_percentage numeric check (target_profit_percentage is null or (target_profit_percentage > 0 and target_profit_percentage <= 1000)),
   target_loss_percentage numeric check (target_loss_percentage is null or (target_loss_percentage > 0 and target_loss_percentage <= 100)),
   created_at timestamptz not null default timezone('utc', now())
@@ -59,12 +55,6 @@ comment on column public.profiles.id is
   'Same uuid as auth.users.id. Primary key and foreign key at once, so a profile cannot outlive its login.';
 comment on column public.profiles.name is
   'Display name shown in the sidebar and Settings. Seeded from signup metadata.';
-comment on column public.profiles.display_currency is
-  'Reporting currency for consolidated totals. Does not change how holdings are stored.';
-comment on column public.profiles.fx_usd_inr is
-  'User-supplied USD/INR rate used to combine Indian and US amounts into one number.';
-comment on column public.profiles.fx_as_of is
-  'Date the user last set fx_usd_inr. Shown next to the rate so a stale rate is visible.';
 comment on column public.profiles.target_profit_percentage is
   'Share of each analysis row target return used for Sell Target. Sell target = buy price * (1 + this / 100 * target return / 100).';
 comment on column public.profiles.target_loss_percentage is
@@ -73,15 +63,14 @@ comment on column public.profiles.created_at is 'Account creation timestamp.';
 
 -- securities ----------------------------------------------------------------
 -- A company. Created on demand while parsing fund holdings, or when a direct
--- stock is added. Scoped per user: two users tracking Apple get two rows.
+-- stock is added. Scoped per user: two users tracking HDFC Bank get two rows.
 
 create table public.securities (
   id text primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
   standardized_name text not null,
   ticker text not null,
-  country public.country_code not null,
-  unique (user_id, ticker, country)
+  constraint securities_user_id_ticker_key unique (user_id, ticker)
 );
 
 create index securities_ticker_idx on public.securities (ticker);
@@ -90,14 +79,12 @@ create index securities_user_idx on public.securities (user_id);
 comment on table public.securities is
   'Companies you have exposure to, whether through a fund or held directly. Per-user, not a shared catalogue.';
 comment on column public.securities.id is
-  'Deterministic slug built from ticker and country, so repeated syncs reuse one row.';
+  'Deterministic slug built from the owner and ticker, so repeated syncs reuse one row.';
 comment on column public.securities.user_id is 'Owner. RLS filters on this column.';
 comment on column public.securities.standardized_name is
   'Cleaned company name. Fund factsheets spell the same company several ways; this is the one the UI shows.';
 comment on column public.securities.ticker is
-  'Exchange symbol. Used with country to merge the same company arriving from different funds.';
-comment on column public.securities.country is
-  'Listing market. Also determines the currency, which is why currency is not stored.';
+  'Symbol or name slug. Unique per user, and used to merge the same company arriving from different funds.';
 
 -- funds ---------------------------------------------------------------------
 -- A mutual fund or ETF whose holdings have been scraped. Deduplicated per user
@@ -108,7 +95,6 @@ create table public.funds (
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
   type public.fund_type not null,
-  country public.country_code not null,
   latest_portfolio_date date not null,
   source_url text not null
 );
@@ -125,7 +111,6 @@ comment on column public.funds.id is 'Generated slug. Referenced by fund_holding
 comment on column public.funds.user_id is 'Owner. RLS filters on this column.';
 comment on column public.funds.name is 'Fund name as entered on the investment that created it.';
 comment on column public.funds.type is 'mutual_fund or etf. Stocks never create a fund row.';
-comment on column public.funds.country is 'Market the fund is domiciled in. Determines currency.';
 comment on column public.funds.latest_portfolio_date is
   'Portfolio date read from the factsheet. Shown on the investment page so you know how old the split is.';
 comment on column public.funds.source_url is
@@ -168,7 +153,6 @@ create table public.investments (
   security_id text references public.securities (id),
   name text not null check (char_length(name) between 1 and 120),
   type public.investment_type not null,
-  country public.country_code not null,
   invested_amount numeric not null check (invested_amount > 0),
   source_url text,
   last_synced_at timestamptz,
@@ -188,10 +172,8 @@ comment on column public.investments.security_id is
 comment on column public.investments.name is 'Label the user typed. Also seeds funds.name on first sync.';
 comment on column public.investments.type is
   'mutual_fund, etf, or stock. Decides whether look-through applies and which of fund_id / security_id is set.';
-comment on column public.investments.country is
-  'Market. Determines the currency, drives the India and US pages, and is the reason currency is not stored.';
 comment on column public.investments.invested_amount is
-  'Amount invested, in the currency implied by country. The root of every exposure calculation.';
+  'Amount invested, in rupees. The root of every exposure calculation.';
 comment on column public.investments.source_url is
   'Fund holdings URL to scrape. Required for mutual funds and ETFs, null for stocks.';
 comment on column public.investments.last_synced_at is
@@ -305,13 +287,10 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, name, display_currency, fx_usd_inr, fx_as_of)
+  insert into public.profiles (id, name)
   values (
     new.id,
-    coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''), 'Investor'),
-    'INR',
-    87.25,
-    (timezone('utc', now()))::date
+    coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''), 'Investor')
   );
   return new;
 end;

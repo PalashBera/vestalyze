@@ -8,7 +8,6 @@ import { EmptyState } from "@/components/empty-state";
 import { ImportHoldingsButton } from "@/components/import-holdings-dialog";
 import { InvestmentForm, SyncInvestmentButton } from "@/components/investment-form";
 import { PageHeader } from "@/components/page-header";
-import { useSettings } from "@/components/settings-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -35,20 +34,16 @@ import {
 } from "@/components/ui/table";
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
-import type { Currency, ScrapeStatus } from "@/lib/api/types";
-import { countryLabel, formatPercent, formatTimestamp, titleize, typeLabel } from "@/lib/format";
+import type { ScrapeStatus } from "@/lib/api/types";
+import { formatMoney, formatPercent, formatTimestamp, titleize, typeLabel } from "@/lib/format";
 import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
 
 function HoldingsTable({
   rows,
   investedAmount,
-  currency,
-  moneyNative,
 }: {
   rows: Array<{ id: string; name: string; allocationPercentage: number }>;
   investedAmount: number;
-  currency: Currency;
-  moneyNative: (amount: number, native: Currency) => string;
 }) {
   return (
     <>
@@ -61,7 +56,7 @@ function HoldingsTable({
               { label: "Allocation", value: formatPercent(row.allocationPercentage) },
               {
                 label: "Effective invested",
-                value: moneyNative(investedAmount * (row.allocationPercentage / 100), currency),
+                value: formatMoney(investedAmount * (row.allocationPercentage / 100)),
               },
             ]}
           />
@@ -82,7 +77,7 @@ function HoldingsTable({
             <TableCell>{row.name}</TableCell>
             <TableCell className="text-right">{formatPercent(row.allocationPercentage)}</TableCell>
             <TableCell className="text-right">
-              {moneyNative(investedAmount * (row.allocationPercentage / 100), currency)}
+              {formatMoney(investedAmount * (row.allocationPercentage / 100))}
             </TableCell>
           </TableRow>
         ))}
@@ -152,7 +147,6 @@ function SyncHistoryTable({
 export default function InvestmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { moneyNative } = useSettings();
   const { data, error, loading, reload } = useAsync(() => api.investments.get(id), [id]);
 
   if (loading && !data) {
@@ -184,7 +178,7 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
     <div className="flex flex-col gap-6">
       <PageHeader
         title={investment.name}
-        description={`${typeLabel(investment.type)} · ${countryLabel(investment.country)}`}
+        description={typeLabel(investment.type)}
         actions={
           <div className="flex flex-wrap gap-2">
             <InvestmentForm investment={investment} onSaved={() => void reload()} labeled />
@@ -218,7 +212,7 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
         <Card>
           <CardHeader>
             <CardDescription>Invested</CardDescription>
-            <CardTitle>{moneyNative(investment.investedAmount, investment.currency)}</CardTitle>
+            <CardTitle>{formatMoney(investment.investedAmount)}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
@@ -256,8 +250,6 @@ export default function InvestmentDetailPage({ params }: { params: Promise<{ id:
                   allocationPercentage: holding.allocationPercentage,
                 }))}
                 investedAmount={investment.investedAmount}
-                currency={investment.currency}
-                moneyNative={moneyNative}
               />
             ) : (
               <EmptyState

@@ -7,7 +7,6 @@ import type {
   StockTrade,
   User,
 } from "@/lib/api/types";
-import { currencyForCountry } from "@/lib/finance/currency";
 import type { Database } from "@/lib/supabase/database.types";
 
 type Tables = Database["public"]["Tables"];
@@ -18,8 +17,6 @@ export function mapSecurity(row: Tables["securities"]["Row"]): Security {
     userId: row.user_id,
     standardizedName: row.standardized_name,
     ticker: row.ticker,
-    country: row.country,
-    currency: currencyForCountry(row.country),
   };
 }
 
@@ -29,8 +26,6 @@ export function mapFund(row: Tables["funds"]["Row"]): Fund {
     userId: row.user_id,
     name: row.name,
     type: row.type,
-    country: row.country,
-    currency: currencyForCountry(row.country),
     latestPortfolioDate: row.latest_portfolio_date,
     sourceUrl: row.source_url,
   };
@@ -54,8 +49,6 @@ export function mapInvestment(row: Tables["investments"]["Row"]): Investment {
     securityId: row.security_id ?? undefined,
     name: row.name,
     type: row.type,
-    country: row.country,
-    currency: currencyForCountry(row.country),
     investedAmount: Number(row.invested_amount),
     sourceUrl: row.source_url ?? undefined,
     lastSyncedAt: row.last_synced_at ?? undefined,
@@ -68,7 +61,6 @@ export function mapUser(id: string, email: string, profile: Tables["profiles"]["
     id,
     email,
     name: profile.name,
-    displayCurrency: profile.display_currency,
     targetProfitPercentage:
       profile.target_profit_percentage === null ? undefined : Number(profile.target_profit_percentage),
     targetLossPercentage:

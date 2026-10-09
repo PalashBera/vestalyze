@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { PencilIcon, RefreshCwIcon } from "lucide-react";
 import { api } from "@/lib/api/client";
-import type { Country, CreateInvestmentRequest, Investment, InvestmentType } from "@/lib/api/types";
+import type { CreateInvestmentRequest, Investment, InvestmentType } from "@/lib/api/types";
 import { typeLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,21 +33,13 @@ const typeItems = [
   { label: "ETF", value: "etf" },
 ];
 
-const countryItems = [
-  { label: "India", value: "IN" },
-  { label: "United States", value: "US" },
-];
-
 export function InvestmentFields({
   type,
-  country,
   defaults,
   lockType = false,
   onTypeChange,
-  onCountryChange,
 }: {
   type: InvestmentType;
-  country: Country;
   defaults?: {
     name?: string;
     investedAmount?: number;
@@ -56,7 +48,6 @@ export function InvestmentFields({
   };
   lockType?: boolean;
   onTypeChange: (type: InvestmentType) => void;
-  onCountryChange: (country: Country) => void;
 }) {
   const needsFundUrl = type === "mutual_fund" || type === "etf";
   return (
@@ -72,46 +63,22 @@ export function InvestmentFields({
           placeholder="Bandhan Small Cap Fund Direct Growth"
         />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel>Type</FieldLabel>
-          {lockType ? (
-            <Input value={typeLabel(type)} disabled />
-          ) : (
-            <Select
-              items={typeItems}
-              value={type}
-              onValueChange={(value) => onTypeChange(value as InvestmentType)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {typeItems.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          )}
-        </Field>
-        <Field>
-          <FieldLabel>Country</FieldLabel>
+      <Field>
+        <FieldLabel>Type</FieldLabel>
+        {lockType ? (
+          <Input value={typeLabel(type)} disabled />
+        ) : (
           <Select
-            items={countryItems}
-            value={country}
-            disabled={lockType}
-            onValueChange={(value) => onCountryChange(value as Country)}
+            items={typeItems}
+            value={type}
+            onValueChange={(value) => onTypeChange(value as InvestmentType)}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {countryItems.map((item) => (
+                {typeItems.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
                     {item.label}
                   </SelectItem>
@@ -119,8 +86,8 @@ export function InvestmentFields({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </Field>
-      </div>
+        )}
+      </Field>
       {needsFundUrl ? (
         <Field>
           <FieldLabel htmlFor="sourceUrl">Fund URL</FieldLabel>
@@ -153,15 +120,10 @@ export function InvestmentFields({
   );
 }
 
-export function payloadFromForm(
-  formData: FormData,
-  type: InvestmentType,
-  country: Country,
-): CreateInvestmentRequest {
+export function payloadFromForm(formData: FormData, type: InvestmentType): CreateInvestmentRequest {
   return {
     name: String(formData.get("name") ?? "").trim(),
     type,
-    country,
     investedAmount: Number(formData.get("investedAmount")),
     ticker: String(formData.get("ticker") ?? ""),
     sourceUrl: String(formData.get("sourceUrl") ?? "").trim() || undefined,
@@ -220,13 +182,12 @@ export function InvestmentForm({
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [type, setType] = useState<InvestmentType>(investment?.type ?? "mutual_fund");
-  const [country, setCountry] = useState<Country>(investment?.country ?? "IN");
 
   // onSubmit rather than the form `action` prop: React resets a form as soon as
   // an action runs, which wipes what the user typed before the save finishes.
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const payload = payloadFromForm(new FormData(event.currentTarget), type, country);
+    const payload = payloadFromForm(new FormData(event.currentTarget), type);
     setPending(true);
     try {
       if (investment) {
@@ -284,7 +245,6 @@ export function InvestmentForm({
         >
           <InvestmentFields
             type={type}
-            country={country}
             lockType={editing}
             defaults={{
               name: investment?.name,
@@ -292,7 +252,6 @@ export function InvestmentForm({
               sourceUrl: investment?.sourceUrl,
             }}
             onTypeChange={setType}
-            onCountryChange={setCountry}
           />
           <DialogFooter>
             <Button type="submit" disabled={pending}>

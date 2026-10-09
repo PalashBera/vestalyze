@@ -1,6 +1,6 @@
 # Vestalyze
 
-Personal look-through investing for Indian mutual funds, ETFs, and US stocks. Vestalyze shows **where your money actually sits** after you add your own holdings. Nothing is preloaded. Each account only sees its own book.
+Personal look-through investing for Indian mutual funds and ETFs. Vestalyze shows **where your money actually sits** after you add your own holdings. Every amount is in rupees; there are no US holdings and no currency conversion. Nothing is preloaded. Each account only sees its own book.
 
 The UI talks only to Next.js `/api/v1`. The BFF stores auth and holdings in **Supabase**.
 
@@ -50,14 +50,14 @@ acknowledgement needs a verified domain.
 ## What you can do
 
 - Land on the public home page, then sign in or register
-- Walk through onboarding (currency + first holdings)
-- Review invested totals, India vs US, and type mix
-- Sort consolidated stock exposure by company, market, total, and weight
+- Walk through onboarding (first holdings)
+- Review invested totals and the mutual fund / ETF mix
+- Sort consolidated stock exposure by company, mutual fund and ETF amounts, total, and weight
 - Open look-through holdings and company drill-down
 - Paste a fund URL on an investment and sync the stock split from the holdings section
 - Keep a trade journal on Stock Trades, with purchase and sale totals, return, and holding period worked out from the buy and sell you enter — leave the sale blank and the trade stays open
 - Track price targets on Stock Analysis, where the target price follows from your entry price and the return you are aiming for
-- Switch display currency (INR / USD), set your USD/INR rate, and pick a theme (light / dark / system)
+- Set Stock Analysis profit and loss targets, and pick a theme (light / dark / system)
 - Delete your account from Settings — that also erases every holding stored with it
 - Send a note from the landing page contact form; the team is notified and the sender gets a receipt
 
@@ -67,9 +67,9 @@ acknowledgement needs a verified domain.
 src/app/api/v1/[...slug]     BFF routes (Supabase)
 src/lib/api/supabase         Auth + Postgres handlers
 src/lib/email                Resend delivery and contact email templates
-src/lib/finance              Exposure and FX math
+src/lib/finance              Exposure, trade, and CSV math
 supabase/schema.sql          Tables and owner-only RLS
-supabase/seed.sql            Notes only; FX defaults live on profiles
+supabase/seed.sql            Notes only; there is no seed data
 docs/SUPABASE.md             Supabase setup
 docs/ER.md                   Data model and ER diagram
 docs/SCHEMA_GUIDE.md         Per-column feature map and verification queries

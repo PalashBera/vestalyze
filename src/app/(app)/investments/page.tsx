@@ -5,7 +5,6 @@ import { WalletIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { InvestmentForm, SyncInvestmentButton } from "@/components/investment-form";
 import { PageHeader } from "@/components/page-header";
-import { useSettings } from "@/components/settings-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,10 +21,9 @@ import {
 } from "@/components/ui/table";
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
-import { countryLabel, formatTimestamp, typeLabel } from "@/lib/format";
+import { formatMoney, formatTimestamp, typeLabel } from "@/lib/format";
 
 export default function InvestmentsPage() {
-  const { moneyNative } = useSettings();
   const { data, error, loading, reload } = useAsync(() => api.investments.list());
 
   if (loading) {
@@ -64,7 +62,7 @@ export default function InvestmentsPage() {
                   key={item.id}
                   title={item.name}
                   href={`/investments/${item.id}`}
-                  subtitle={`${typeLabel(item.type)} · ${countryLabel(item.country)}`}
+                  subtitle={typeLabel(item.type)}
                   actions={
                     <div className="flex gap-1">
                       <InvestmentForm investment={item} onSaved={() => void reload()} />
@@ -72,7 +70,7 @@ export default function InvestmentsPage() {
                     </div>
                   }
                   fields={[
-                    { label: "Invested", value: moneyNative(item.investedAmount, item.currency) },
+                    { label: "Invested", value: formatMoney(item.investedAmount) },
                     { label: "Last sync", value: item.type === "stock" ? "—" : formatTimestamp(item.lastSyncedAt) },
                   ]}
                 />
@@ -84,7 +82,6 @@ export default function InvestmentsPage() {
                 <TableRow>
                   <TableHead>Investment</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Country</TableHead>
                   <TableHead className="text-right">Invested</TableHead>
                   <TableHead>Last sync</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -106,10 +103,7 @@ export default function InvestmentsPage() {
                     <TableCell>
                       <Badge variant="secondary">{typeLabel(item.type)}</Badge>
                     </TableCell>
-                    <TableCell>{countryLabel(item.country)}</TableCell>
-                    <TableCell className="text-right">
-                      {moneyNative(item.investedAmount, item.currency)}
-                    </TableCell>
+                    <TableCell className="text-right">{formatMoney(item.investedAmount)}</TableCell>
                     <TableCell>
                       {item.type === "stock" ? "—" : formatTimestamp(item.lastSyncedAt)}
                     </TableCell>

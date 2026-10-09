@@ -6,16 +6,16 @@ import { APP_DESCRIPTION, APP_TAGLINE } from "@/lib/brand";
 
 const heroStats = [
   { label: "Total invested", value: "₹12,05,000" },
-  { label: "India", value: "59.8%" },
-  { label: "United States", value: "40.2%" },
+  { label: "Mutual funds", value: "68.4%" },
+  { label: "ETFs", value: "31.6%" },
 ];
 
 const heroExposure = [
   { name: "HDFC Bank", weight: 18.4 },
-  { name: "Apple", weight: 17.0 },
-  { name: "Reliance Industries", weight: 13.9 },
-  { name: "Microsoft", weight: 9.4 },
-  { name: "NVIDIA", weight: 8.6 },
+  { name: "ICICI Bank", weight: 13.9 },
+  { name: "Reliance Industries", weight: 9.4 },
+  { name: "Infosys", weight: 8.6 },
+  { name: "Bharti Airtel", weight: 5.7 },
 ];
 
 const trust = [
@@ -69,7 +69,7 @@ function HeroPreview() {
       </div>
 
       <p className="text-[0.7rem] text-muted-foreground">
-        Rolled up from 6 holdings across 2 markets · illustrative numbers
+        Rolled up from 4 funds and ETFs · illustrative numbers
       </p>
     </AppWindow>
   );

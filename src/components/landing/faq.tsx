@@ -16,22 +16,16 @@ const faqs = [
       "Paste a public fund URL on a mutual fund or ETF, then sync. Vestalyze reads the published holdings table and weights each company by your invested amount, so a 6% position inside a fund you put ₹6,00,000 into becomes ₹36,000 of real exposure.",
   },
   {
-    value: "fx",
-    question: "How are INR and USD combined?",
-    answer:
-      "They are not, until you ask. Indian amounts stay in INR and US amounts stay in USD on their own pages. Consolidated totals convert using the USD/INR rate you set in Settings.",
-  },
-  {
     value: "data",
     question: "Do you preload a sample portfolio?",
     answer:
       "Never. A new account is genuinely empty, and the sample numbers on this page are illustrative only. Your account shows real figures the moment you add your first holding, and nothing before that.",
   },
   {
-    value: "markets",
-    question: "Can I track both India and the US?",
+    value: "coverage",
+    question: "Which funds can I track?",
     answer:
-      "Yes. Mutual funds and ETFs across both markets live in one book, with a dedicated page per market and a consolidated view across them.",
+      "Indian mutual funds and ETFs. Add the fund's public page URL and sync to pull its holdings. Every amount is in rupees, so there is no exchange rate to keep up to date.",
   },
   {
     value: "delete",

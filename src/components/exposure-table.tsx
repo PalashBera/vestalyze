@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDownIcon, ArrowUpIcon, ArrowUpDownIcon } from "lucide-react";
 import type { StockExposure } from "@/lib/api/types";
-import { useSettings } from "@/components/settings-provider";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -15,27 +14,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DesktopTable, RecordList, RecordListItem } from "@/components/record-list";
-import { formatPercent } from "@/lib/format";
+import { formatMoney, formatPercent } from "@/lib/format";
 
-type Variant = "consolidated" | "india" | "us";
-type SortKey = "company" | "india" | "us" | "total" | "weight" | "mf" | "etf";
+type SortKey = "company" | "mf" | "etf" | "total" | "weight";
 
 function valueFor(row: StockExposure, key: SortKey): string | number {
   switch (key) {
     case "company":
       return row.security.standardizedName.toLowerCase();
-    case "india":
-      return row.indiaInvestedInr;
-    case "us":
-      return row.usInvestedInr;
-    case "total":
-      return row.totalInvestedInr;
-    case "weight":
-      return row.portfolioPercentage;
     case "mf":
       return row.mutualFundInvestedInr;
     case "etf":
       return row.etfInvestedInr;
+    case "total":
+      return row.totalInvestedInr;
+    case "weight":
+      return row.portfolioPercentage;
     default:
       return 0;
   }
@@ -75,15 +69,12 @@ function SortableHead({
 
 export function ExposureTable({
   rows,
-  variant = "consolidated",
   disableLinks = false,
 }: {
   rows: StockExposure[];
-  variant?: Variant;
   disableLinks?: boolean;
 }) {
-  const { money } = useSettings();
-  const [sortKey, setSortKey] = useState<SortKey>(variant === "consolidated" ? "total" : "total");
+  const [sortKey, setSortKey] = useState<SortKey>("total");
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
 
   function onSort(column: SortKey) {
@@ -104,30 +95,6 @@ export function ExposureTable({
     });
   }, [rows, sortKey, direction]);
 
-  const fieldsFor = (row: StockExposure) => {
-    if (variant === "consolidated") {
-      return [
-        { label: "India", value: money(row.indiaInvestedInr) },
-        { label: "US", value: money(row.usInvestedInr) },
-        { label: "Total", value: money(row.totalInvestedInr) },
-        { label: "Weight", value: formatPercent(row.portfolioPercentage) },
-      ];
-    }
-    if (variant === "india") {
-      return [
-        { label: "Mutual Funds", value: money(row.mutualFundInvestedInr) },
-        { label: "ETFs", value: money(row.etfInvestedInr) },
-        { label: "Total", value: money(row.totalInvestedInr) },
-        { label: "Weight", value: formatPercent(row.portfolioPercentage) },
-      ];
-    }
-    return [
-      { label: "ETF", value: money(row.etfInvestedInr) },
-      { label: "Total", value: money(row.totalInvestedInr) },
-      { label: "Weight", value: formatPercent(row.portfolioPercentage) },
-    ];
-  };
-
   return (
     <>
       <RecordList>
@@ -136,76 +103,51 @@ export function ExposureTable({
             key={row.security.id}
             title={row.security.standardizedName}
             href={disableLinks ? undefined : `/exposure/${row.security.id}`}
-            fields={fieldsFor(row)}
+            fields={[
+              { label: "Mutual Funds", value: formatMoney(row.mutualFundInvestedInr) },
+              { label: "ETFs", value: formatMoney(row.etfInvestedInr) },
+              { label: "Total", value: formatMoney(row.totalInvestedInr) },
+              { label: "Weight", value: formatPercent(row.portfolioPercentage) },
+            ]}
           />
         ))}
       </RecordList>
       <DesktopTable>
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {variant === "consolidated" ? (
-            <>
-              <SortableHead label="Company" column="company" active={sortKey} direction={direction} onSort={onSort} />
-              <SortableHead label="India" column="india" active={sortKey} direction={direction} align="right" onSort={onSort} />
-              <SortableHead label="US" column="us" active={sortKey} direction={direction} align="right" onSort={onSort} />
-              <SortableHead label="Total" column="total" active={sortKey} direction={direction} align="right" onSort={onSort} />
-              <SortableHead label="Weight" column="weight" active={sortKey} direction={direction} align="right" onSort={onSort} />
-            </>
-          ) : variant === "india" ? (
-            <>
+        <Table>
+          <TableHeader>
+            <TableRow>
               <SortableHead label="Company" column="company" active={sortKey} direction={direction} onSort={onSort} />
               <SortableHead label="Mutual Funds" column="mf" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="ETFs" column="etf" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="Total" column="total" active={sortKey} direction={direction} align="right" onSort={onSort} />
               <SortableHead label="Weight" column="weight" active={sortKey} direction={direction} align="right" onSort={onSort} />
-            </>
-          ) : (
-            <>
-              <SortableHead label="Company" column="company" active={sortKey} direction={direction} onSort={onSort} />
-              <SortableHead label="ETF" column="etf" active={sortKey} direction={direction} align="right" onSort={onSort} />
-              <SortableHead label="Total" column="total" active={sortKey} direction={direction} align="right" onSort={onSort} />
-              <SortableHead label="Weight" column="weight" active={sortKey} direction={direction} align="right" onSort={onSort} />
-            </>
-          )}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {sorted.map((row) => (
-          <TableRow key={row.security.id}>
-            <TableCell>
-              {disableLinks ? (
-                <span className="font-medium">{row.security.standardizedName}</span>
-              ) : (
-                <Button
-                  variant="link"
-                  nativeButton={false}
-                  render={<Link href={`/exposure/${row.security.id}`} />}
-                  className="h-auto justify-start px-0"
-                >
-                  {row.security.standardizedName}
-                </Button>
-              )}
-            </TableCell>
-            {variant === "consolidated" ? (
-              <>
-                <TableCell className="text-right">{money(row.indiaInvestedInr)}</TableCell>
-                <TableCell className="text-right">{money(row.usInvestedInr)}</TableCell>
-              </>
-            ) : variant === "india" ? (
-              <>
-                <TableCell className="text-right">{money(row.mutualFundInvestedInr)}</TableCell>
-                <TableCell className="text-right">{money(row.etfInvestedInr)}</TableCell>
-              </>
-            ) : (
-              <TableCell className="text-right">{money(row.etfInvestedInr)}</TableCell>
-            )}
-            <TableCell className="text-right font-medium">{money(row.totalInvestedInr)}</TableCell>
-            <TableCell className="text-right">{formatPercent(row.portfolioPercentage)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((row) => (
+              <TableRow key={row.security.id}>
+                <TableCell>
+                  {disableLinks ? (
+                    <span className="font-medium">{row.security.standardizedName}</span>
+                  ) : (
+                    <Button
+                      variant="link"
+                      nativeButton={false}
+                      render={<Link href={`/exposure/${row.security.id}`} />}
+                      className="h-auto justify-start px-0"
+                    >
+                      {row.security.standardizedName}
+                    </Button>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">{formatMoney(row.mutualFundInvestedInr)}</TableCell>
+                <TableCell className="text-right">{formatMoney(row.etfInvestedInr)}</TableCell>
+                <TableCell className="text-right font-medium">{formatMoney(row.totalInvestedInr)}</TableCell>
+                <TableCell className="text-right">{formatPercent(row.portfolioPercentage)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </DesktopTable>
     </>
   );

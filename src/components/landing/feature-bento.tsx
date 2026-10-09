@@ -50,7 +50,7 @@ function LookThroughVisual() {
     <div className="flex h-full flex-col justify-center gap-3">
       <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/60 px-3 py-2">
         <span className="truncate text-xs font-medium">Parag Parikh Flexi Cap Direct</span>
-        <span className="shrink-0 font-mono text-[0.7rem] text-muted-foreground">₹6,10,000</span>
+        <span className="shrink-0 font-mono text-[0.7rem] text-muted-foreground">₹4,60,000</span>
       </div>
       <div className="flex items-center justify-center gap-2 text-[0.65rem] tracking-widest text-muted-foreground uppercase">
         <ArrowDownIcon className="size-3" aria-hidden />
@@ -81,40 +81,39 @@ function OverlapVisual() {
         <span className="-ml-12 size-28 rounded-full border border-foreground/25 bg-foreground/10" />
         <span className="absolute inset-0 flex items-center justify-center">
           <span className="rounded-full bg-background/85 px-2.5 py-1 font-heading text-sm tracking-tight backdrop-blur">
-            12.4%
+            24.3%
           </span>
         </span>
       </div>
       <div className="flex items-center gap-4 text-[0.7rem] text-muted-foreground">
         <span>Flexi Cap</span>
         <span className="size-1 rounded-full bg-foreground/25" />
-        <span>Invesco QQQ</span>
+        <span>Nifty 50 BeES</span>
       </div>
     </div>
   );
 }
 
-const markets = [
-  { label: "India", currency: "INR", amount: "₹7,20,000", share: 59.8 },
-  { label: "United States", currency: "USD", amount: "$5,560", share: 40.2 },
+const typeSplit = [
+  { label: "Mutual funds", amount: "₹8,24,000", share: 68.4 },
+  { label: "ETFs", amount: "₹3,81,000", share: 31.6 },
 ];
 
-function MarketsVisual() {
+function TypeSplitVisual() {
   return (
     <div className="flex h-full flex-col justify-center gap-4">
-      {markets.map((market) => (
-        <div key={market.label} className="flex flex-col gap-2">
+      {typeSplit.map((item) => (
+        <div key={item.label} className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-xs font-medium">{market.label}</span>
-            <span className="font-mono text-[0.7rem] text-muted-foreground tabular-nums">{market.amount}</span>
+            <span className="text-xs font-medium">{item.label}</span>
+            <span className="font-mono text-[0.7rem] text-muted-foreground tabular-nums">{item.amount}</span>
           </div>
           <div className="flex items-center gap-2">
-            <WeightBar value={market.share} max={100} />
+            <WeightBar value={item.share} max={100} />
             <span className="w-10 shrink-0 text-right font-mono text-[0.65rem] text-muted-foreground tabular-nums">
-              {market.share}%
+              {item.share}%
             </span>
           </div>
-          <span className="text-[0.65rem] text-muted-foreground">Held and reported in {market.currency}</span>
         </div>
       ))}
     </div>
@@ -172,9 +171,9 @@ export function LandingFeatureBento() {
         />
         <BentoCard
           className="md:col-span-2"
-          visual={<MarketsVisual />}
-          title="India and the US, side by side"
-          body="INR stays INR and USD stays USD. Conversion happens only when you ask for one reporting number."
+          visual={<TypeSplitVisual />}
+          title="Mutual funds and ETFs, side by side"
+          body="See how your money splits between mutual funds and ETFs, then which companies each one adds to your exposure."
         />
         <BentoCard
           className="md:col-span-3"

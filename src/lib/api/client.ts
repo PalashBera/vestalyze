@@ -4,12 +4,10 @@ import type {
   Fund,
   FundHolding,
   FundOverlap,
-  FxRate,
   Investment,
   InvestmentSync,
   CreateStockAnalysisRequest,
   CreateStockTradeRequest,
-  MarketDashboard,
   PortfolioOverview,
   Security,
   StockAnalysis,
@@ -113,14 +111,11 @@ export const api = {
   },
   portfolio: {
     overview: () => request<PortfolioOverview>("/portfolio/overview"),
-    india: () => request<MarketDashboard>("/portfolio/markets/IN"),
-    us: () => request<MarketDashboard>("/portfolio/markets/US"),
     exposure: () => request<{ exposures: StockExposure[] }>("/portfolio/exposure"),
     exposureDetail: (securityId: string) =>
       request<StockExposure>(`/portfolio/exposure/${securityId}`),
     allocation: () =>
       request<{
-        market: AllocationSlice[];
         type: AllocationSlice[];
         stocks: AllocationSlice[];
       }>("/portfolio/allocation"),
@@ -164,21 +159,10 @@ export const api = {
   },
   settings: {
     get: () => request<UserSettings>("/settings"),
-    update: (displayCurrency: UserSettings["displayCurrency"]) =>
-      request<UserSettings>("/settings", {
-        method: "PATCH",
-        body: JSON.stringify({ displayCurrency }),
-      }),
     updateTargets: (input: { targetProfitPercentage: number; targetLossPercentage: number }) =>
       request<UserSettings>("/settings", {
         method: "PATCH",
         body: JSON.stringify(input),
-      }),
-    fx: () => request<FxRate>("/fx/rate"),
-    updateFx: (rate: number) =>
-      request<FxRate>("/fx/rate", {
-        method: "PATCH",
-        body: JSON.stringify({ rate }),
       }),
   },
   contact: {

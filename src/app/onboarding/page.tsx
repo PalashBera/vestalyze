@@ -1,65 +1,30 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { BrandLockup } from "@/components/brand-mark";
 import { InvestmentFields, payloadFromForm } from "@/components/investment-form";
-import { PageLoader } from "@/components/page-loader";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useSettings } from "@/components/settings-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { api } from "@/lib/api/client";
-import type { Country, Currency, InvestmentType } from "@/lib/api/types";
-
-const currencyItems = [
-  { label: "INR", value: "INR" },
-  { label: "USD", value: "USD" },
-];
+import type { InvestmentType } from "@/lib/api/types";
 
 export default function OnboardingPage() {
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <OnboardingForm />
-    </Suspense>
-  );
-}
-
-function OnboardingForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { currency, setCurrency } = useSettings();
-  const [step, setStep] = useState<1 | 2>(1);
   const [pending, setPending] = useState(false);
   const [added, setAdded] = useState(0);
   const [type, setType] = useState<InvestmentType>("mutual_fund");
-  const [country, setCountry] = useState<Country>(searchParams.get("country") === "US" ? "US" : "IN");
-
-  async function onCurrencyChange(value: string | null) {
-    if (value !== "INR" && value !== "USD") {
-      return;
-    }
-    await setCurrency(value as Currency);
-  }
 
   // onSubmit rather than the form `action` prop, so a failed save keeps what the
   // user typed. The form is cleared only once the holding is saved.
   async function onAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
-    const payload = payloadFromForm(new FormData(form), type, country);
+    const payload = payloadFromForm(new FormData(form), type);
     setPending(true);
     try {
       await api.investments.create(payload);
@@ -82,71 +47,33 @@ function OnboardingForm() {
       <main className="flex min-h-svh items-center justify-center px-4 py-24">
         <Card className="w-full max-w-3xl">
           <CardHeader>
-            <CardTitle>{step === 1 ? "How should we report?" : "Add your first holdings"}</CardTitle>
+            <CardTitle>Add your first holdings</CardTitle>
             <CardDescription>
-              {step === 1
-                ? "Pick a display currency. You can change this later in Settings."
-                : added > 0
-                  ? `${added} holding${added === 1 ? "" : "s"} added. Add another or finish.`
-                  : "Start with a holding you already own. Nothing is preloaded."}
+              {added > 0
+                ? `${added} holding${added === 1 ? "" : "s"} added. Add another or finish.`
+                : "Start with a mutual fund or ETF you already own. Nothing is preloaded."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {step === 1 ? (
-              <div className="flex flex-col gap-6">
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel>Display currency</FieldLabel>
-                    <Select items={currencyItems} value={currency} onValueChange={onCurrencyChange}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {currencyItems.map((item) => (
-                            <SelectItem key={item.value} value={item.value}>
-                              {item.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>Indian amounts stay in INR. US amounts stay in USD. Totals convert with FX.</FieldDescription>
-                  </Field>
-                </FieldGroup>
-                <div className="flex items-center justify-between">
-                  <Button variant="ghost" nativeButton={false} render={<Link href="/dashboard" />}>
-                    Skip for now
+            <form className="flex flex-col gap-6" onSubmit={(event) => void onAdd(event)}>
+              <InvestmentFields type={type} onTypeChange={setType} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Button type="button" variant="ghost" nativeButton={false} render={<Link href="/dashboard" />}>
+                  {added > 0 ? "Finish" : "Skip for now"}
+                </Button>
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={pending}>
+                    {pending ? <Spinner data-icon="inline-start" /> : null}
+                    Save holding
                   </Button>
-                  <Button onClick={() => setStep(2)}>Continue</Button>
+                  {added > 0 ? (
+                    <Button type="button" onClick={() => router.push("/dashboard")}>
+                      Go to dashboard
+                    </Button>
+                  ) : null}
                 </div>
               </div>
-            ) : (
-              <form className="flex flex-col gap-6" onSubmit={(event) => void onAdd(event)}>
-                <InvestmentFields
-                  type={type}
-                  country={country}
-                  onTypeChange={setType}
-                  onCountryChange={setCountry}
-                />
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Button type="button" variant="ghost" nativeButton={false} render={<Link href="/dashboard" />}>
-                    {added > 0 ? "Finish" : "Skip for now"}
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button type="submit" disabled={pending}>
-                      {pending ? <Spinner data-icon="inline-start" /> : null}
-                      Save holding
-                    </Button>
-                    {added > 0 ? (
-                      <Button type="button" onClick={() => router.push("/dashboard")}>
-                        Go to dashboard
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </form>
-            )}
+            </form>
           </CardContent>
         </Card>
       </main>

@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { countryLabel, formatPercent, typeLabel } from "@/lib/format";
+import { formatPercent, typeLabel } from "@/lib/format";
 import { placeholderExposures, placeholderInvestments, placeholderOverlaps } from "@/lib/placeholder/portfolio";
 
 const tabs = [
@@ -100,7 +100,7 @@ export function LandingProductShowcase() {
               <RecordListItem
                 key={item.id}
                 title={item.name}
-                subtitle={`${typeLabel(item.type)} · ${countryLabel(item.country)}`}
+                subtitle={typeLabel(item.type)}
                 fields={[
                   { label: "Invested", value: item.invested },
                   { label: "Last sync", value: item.lastSync },
@@ -114,7 +114,6 @@ export function LandingProductShowcase() {
                 <TableRow>
                   <TableHead>Investment</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Country</TableHead>
                   <TableHead className="text-right">Invested</TableHead>
                   <TableHead>Last sync</TableHead>
                 </TableRow>
@@ -124,7 +123,6 @@ export function LandingProductShowcase() {
                   <TableRow key={item.id}>
                     <TableCell>{item.name}</TableCell>
                     <TableCell>{typeLabel(item.type)}</TableCell>
-                    <TableCell>{countryLabel(item.country)}</TableCell>
                     <TableCell className="text-right">{item.invested}</TableCell>
                     <TableCell>{item.lastSync}</TableCell>
                   </TableRow>

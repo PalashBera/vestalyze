@@ -1,5 +1,3 @@
-export type Country = "IN" | "US";
-export type Currency = "INR" | "USD";
 export type InvestmentType = "mutual_fund" | "etf" | "stock";
 export type ScrapeStatus = "success" | "failed" | "running";
 
@@ -7,7 +5,6 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  displayCurrency: Currency;
   targetProfitPercentage?: number;
   targetLossPercentage?: number;
   createdAt: string;
@@ -18,8 +15,6 @@ export interface Security {
   userId: string;
   standardizedName: string;
   ticker: string;
-  country: Country;
-  currency: Currency;
 }
 
 export interface Fund {
@@ -27,8 +22,6 @@ export interface Fund {
   userId: string;
   name: string;
   type: Exclude<InvestmentType, "stock">;
-  country: Country;
-  currency: Currency;
   latestPortfolioDate: string;
   sourceUrl: string;
 }
@@ -48,8 +41,6 @@ export interface Investment {
   securityId?: string;
   name: string;
   type: InvestmentType;
-  country: Country;
-  currency: Currency;
   investedAmount: number;
   sourceUrl?: string;
   lastSyncedAt?: string;
@@ -67,23 +58,14 @@ export interface InvestmentSync {
 }
 
 export interface UserSettings {
-  displayCurrency: Currency;
   targetProfitPercentage?: number;
   targetLossPercentage?: number;
-}
-
-export interface FxRate {
-  base: Currency;
-  quote: Currency;
-  rate: number;
-  asOf: string;
 }
 
 export interface AllocationSlice {
   key: string;
   label: string;
   amountInr: number;
-  amountUsd: number;
   percentage: number;
 }
 
@@ -91,10 +73,7 @@ export interface ExposureBreakdown {
   sourceType: InvestmentType;
   sourceName: string;
   investmentId: string;
-  country: Country;
-  currency: Currency;
   allocationPercentage?: number;
-  investedExposureNative: number;
   investedExposureInr: number;
 }
 
@@ -103,8 +82,6 @@ export interface StockExposure {
   mutualFundInvestedInr: number;
   etfInvestedInr: number;
   directInvestedInr: number;
-  indiaInvestedInr: number;
-  usInvestedInr: number;
   totalInvestedInr: number;
   portfolioPercentage: number;
   breakdown: ExposureBreakdown[];
@@ -112,27 +89,11 @@ export interface StockExposure {
 
 export interface PortfolioOverview {
   totalInvestedInr: number;
-  indiaInvestedInr: number;
-  usInvestedInr: number;
   mutualFundInvestedInr: number;
   etfInvestedInr: number;
   stockInvestedInr: number;
-  fxRate: FxRate;
-  marketAllocation: AllocationSlice[];
   typeAllocation: AllocationSlice[];
   topHoldings: StockExposure[];
-}
-
-export interface MarketDashboard {
-  country: Country;
-  totalInvestedNative: number;
-  currency: Currency;
-  byType: {
-    mutualFund: number;
-    etf: number;
-    stock: number;
-  };
-  exposures: StockExposure[];
 }
 
 export interface FundOverlap {
@@ -164,7 +125,6 @@ export interface RegisterRequest {
 export interface CreateInvestmentRequest {
   name: string;
   type: InvestmentType;
-  country: Country;
   investedAmount: number;
   fundId?: string;
   securityId?: string;

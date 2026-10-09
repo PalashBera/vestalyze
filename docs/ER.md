@@ -23,7 +23,10 @@ This is a rendered image, not a live Mermaid block, so it always displays the sa
 
 `STOCK-TRADES` and `STOCK-ANALYSIS` connect only to `AUTH-USERS`. That isolation is deliberate, not an
 oversight: a closed trade is not a holding, so nothing in those two tables reaches the dashboard,
-market, exposure, or overlap screens.
+exposure, or overlap screens.
+
+Vestalyze is India-only. No table has a country, currency, or exchange-rate column: every holding is
+Indian and every amount is in rupees.
 
 In the diagram, `PROFILES.id` is also the FK to `AUTH-USERS`. Columns named `type` in SQL are shown as `fund_type` and `investment_type` because Mermaid treats `type` as a reserved word. Use the field tables below for the exact Postgres names.
 
@@ -52,9 +55,6 @@ erDiagram
     PROFILES {
         uuid id PK
         string name
-        string display_currency
-        float fx_usd_inr
-        date fx_as_of
         float target_profit_percentage
         float target_loss_percentage
         datetime created_at
@@ -64,14 +64,12 @@ erDiagram
         uuid user_id FK
         string standardized_name
         string ticker
-        string country
     }
     FUNDS {
         string id PK
         uuid user_id FK
         string name
         string fund_type
-        string country
         date latest_portfolio_date
         string source_url
     }
@@ -89,7 +87,6 @@ erDiagram
         string security_id FK
         string name
         string investment_type
-        string country
         float invested_amount
         string source_url
         datetime last_synced_at
@@ -160,8 +157,6 @@ Deleting the account calls `delete_own_account()`: analysis → trades → syncs
 
 | Type              | Values                         | Why                                                                                   |
 | ----------------- | ------------------------------ | ------------------------------------------------------------------------------------- |
-| `country_code`    | `IN`, `US`                     | Markets the product supports. Drives India vs US views and which currency a row uses. |
-| `currency_code`   | `INR`, `USD`                   | Only used by `profiles.display_currency`. Position currency is derived from country.  |
 | `investment_type` | `mutual_fund`, `etf`, `stock`  | What the user bought. Stocks do not sync a fund URL.                                  |
 | `fund_type`       | `mutual_fund`, `etf`           | Same as investment type minus stock. A fund catalog row is never a direct stock.      |
 | `scrape_status`   | `success`, `failed`, `running` | One sync attempt on the investment detail page.                                       |
@@ -182,17 +177,14 @@ Login identity. Created by `signUp`. The app reads `id` and `email` only.
 
 ## `profiles`
 
-One row per account. Settings, sidebar name, display currency, and the USD/INR rate used to combine India and US totals.
+One row per account. Settings, sidebar name, and the Stock Analysis targets.
 
-Inserted by the `handle_new_user` trigger on signup. The user can update name and FX later. There is no insert policy for `authenticated`; only the trigger (and account delete) write this row.
+Inserted by the `handle_new_user` trigger on signup. The user can update name and analysis targets later. There is no insert policy for `authenticated`; only the trigger (and account delete) write this row.
 
 | Field              | Type                     | Purpose                                                                                             |
 | ------------------ | ------------------------ | --------------------------------------------------------------------------------------------------- |
 | `id`               | `uuid` PK → `auth.users` | Same id as the Auth user. One profile per login. Cascade-deleted with the Auth user.                |
 | `name`             | `text` (1–80)            | Display name (sidebar, Settings, onboarding). Comes from signup metadata, then Edit profile.        |
-| `display_currency` | `INR` \| `USD`           | How consolidated amounts are shown. Native lots stay in their own currency; totals convert with FX. |
-| `fx_usd_inr`       | `numeric` > 0            | Manual USD per INR. Default `87.25`. Used for India vs US and portfolio totals.                     |
-| `fx_as_of`         | `date`                   | Day the rate was last saved. Shown as “Last set …” in Settings.                                     |
 | `target_profit_percentage` | `numeric` (optional) | Share of each analysis row's target return for Sell Target. Buy 100, target 20%, 80% here → 116. |
 | `target_loss_percentage`   | `numeric` (optional) | Share of each analysis row's target return for Stop Loss. Same example at 80% → 84.              |
 | `created_at`       | `timestamptz`            | When the profile row was created (signup).                                                          |
@@ -201,23 +193,22 @@ Inserted by the `handle_new_user` trigger on signup. The user can update name an
 
 ## `securities`
 
-Per-user company master. Direct stocks the user enters and companies scraped from a fund book both land here. Unique on `(user_id, ticker, country)` so two accounts can own `AAPL` / `US` without colliding, and the same ticker in India vs US stays two rows.
+Per-user company master. Direct stocks the user enters and companies scraped from a fund book both land here. Unique on `(user_id, ticker)` so two accounts can own `HDFCBANK` without colliding.
 
 | Field               | Type                  | Purpose                                                                                                                                                            |
 | ------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`                | `text` PK             | Stable id (`sec-…`). Built from user + ticker + country so a later sync can find the same company.                                                                 |
+| `id`                | `text` PK             | Stable id (`sec-…`). Built from user + ticker so a later sync can find the same company. Rows created before the India-only change end in `-in`; both forms are valid. |
 | `user_id`           | `uuid` → `auth.users` | Tenant. RLS: only the owner reads or writes.                                                                                                                       |
-| `standardized_name` | `text`                | Label in exposure tables and company drill-down (“HDFC Bank”, “Apple”).                                                                                            |
+| `standardized_name` | `text`                | Label in exposure tables and company drill-down (“HDFC Bank”, “Infosys”).                                                                                          |
 | `ticker`            | `text`                | Dedup key. For a typed stock this is the stock code (`HDFCBANK`). For a scraped holding it is a slug from the company name. Not shown as a column on most screens. |
-| `country`           | `IN` \| `US`          | Which market book this name belongs to. Part of uniqueness, and the input to the derived currency.                                                                 |
 
-Category / sector is not stored. Weight and market split come from investments + holdings, not from a sector field. Currency is not stored either: it is `IN → INR`, `US → USD`, derived in `currencyForCountry`.
+Category / sector is not stored. Weight comes from investments + holdings, not from a sector field. There is no currency column: every amount is in rupees.
 
 ---
 
 ## `funds`
 
-A mutual fund or ETF **source** for this user: name, market, and the public URL used to scrape the stock split. Two investments that share the same URL reuse one fund and therefore the same holdings.
+A mutual fund or ETF **source** for this user: name, type, and the public URL used to scrape the stock split. Two investments that share the same URL reuse one fund and therefore the same holdings.
 
 | Field                   | Type                   | Purpose                                                                                                                         |
 | ----------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -225,7 +216,6 @@ A mutual fund or ETF **source** for this user: name, market, and the public URL 
 | `user_id`               | `uuid` → `auth.users`  | Tenant.                                                                                                                         |
 | `name`                  | `text`                 | Fund or ETF name (usually copied from the investment).                                                                          |
 | `type`                  | `mutual_fund` \| `etf` | Product kind. Never `stock`.                                                                                                    |
-| `country`               | `IN` \| `US`           | Market of the product. Also the input to the derived currency.                                                                  |
 | `latest_portfolio_date` | `date`                 | As-of date from the last successful scrape (holding date on the page). Shown next to “Underlying holdings”.                     |
 | `source_url`            | `text`                 | Public factsheet / INDmoney URL. Unique per user when non-empty so a second investment with the same URL attaches to this fund. |
 
@@ -241,7 +231,7 @@ The look-through book: each row is “this fund has X% in that company.” Sync 
 | `user_id`               | `uuid` → `auth.users` | Tenant (same owner as the fund). Lets RLS filter without joining.                                                           |
 | `fund_id`               | `text` → `funds`      | Which product this weight belongs to. Cascade-deleted with the fund.                                                        |
 | `security_id`           | `text` → `securities` | Which company. Combined across funds on the exposure pages.                                                                 |
-| `allocation_percentage` | `numeric(8,4)` 0–100  | Weight in the fund. `invested_amount × weight / 100` is the user’s rupee/dollar exposure to that name through this product. |
+| `allocation_percentage` | `numeric(8,4)` 0–100  | Weight in the fund. `invested_amount × weight / 100` is the user’s rupee exposure to that name through this product.        |
 
 Unique on `(fund_id, security_id)`: one company appears at most once per fund.
 
@@ -259,8 +249,7 @@ A lot the user actually holds: how much they put in, what kind of product, and (
 | `security_id`     | `text` → `securities`, nullable   | Set for a direct stock. Empty for a fund/ETF (companies live on `fund_holdings` instead).                             |
 | `name`            | `text` (1–120)                    | What the user typed (fund name or company name). List and detail title.                                               |
 | `type`            | `mutual_fund` \| `etf` \| `stock` | Controls whether Fund URL + Sync are shown.                                                                           |
-| `country`         | `IN` \| `US`                      | Market of this lot. Also the input to the derived currency of `invested_amount`.                                      |
-| `invested_amount` | `numeric` > 0                     | Money invested in this lot. For a stock this is 100% of that company. For a fund it is spread across `fund_holdings`. |
+| `invested_amount` | `numeric` > 0                     | Rupees invested in this lot. For a stock this is 100% of that company. For a fund it is spread across `fund_holdings`. |
 | `source_url`      | `text`, nullable                  | Fund URL on the investment (may match `funds.source_url`). Required to sync. Unused for stocks.                       |
 | `last_synced_at`  | `timestamptz`, nullable           | Last successful holdings sync. Shown as “Last sync”. Empty for stocks.                                                |
 | `created_at`      | `timestamptz`                     | When the lot was added. List order.                                                                                   |
@@ -342,11 +331,11 @@ Target Price is `buy_price × (1 + target_return_percentage / 100)`, computed by
 | Omitted                               | Why                                                                                       |
 | ------------------------------------- | ----------------------------------------------------------------------------------------- |
 | Password / session tables in `public` | Supabase Auth owns those.                                                                 |
-| Stock category / sector               | Exposure is by company, market, and weight, not industry tags.                            |
+| Stock category / sector               | Exposure is by company and weight, not industry tags.                                     |
 | Units / quantity                      | Invested amount plus allocation % is the look-through input.                              |
 | Shared global security master         | Each account has its own `securities` so one user’s scrape never leaks into another book. |
 | Precomputed exposure                  | Recalculated on read so a new lot or sync is always reflected.                            |
-| `currency` on any table               | A function of `country` (`IN → INR`, `US → USD`). Derived once in `currencyForCountry`.   |
+| `country`, `currency`, FX rate        | India-only. Every holding is Indian and every amount is INR, so nothing is converted.     |
 | Per-holding `holding_date`            | Every row in a snapshot shares one date, already on `funds.latest_portfolio_date`.        |
 | `funds.last_scraped_at`               | Duplicated `investments.last_synced_at`, which is the one the UI actually shows.          |
 | Trade totals, return, duration        | All derivable from price, quantity, and the two dates. Computed in `finance/trades.ts`.   |

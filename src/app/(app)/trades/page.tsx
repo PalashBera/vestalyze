@@ -55,11 +55,11 @@ type SortKey =
 type StatusFilter = "all" | "in-progress" | "completed";
 
 function inr(amount: number): string {
-  return formatMoney(amount, "INR");
+  return formatMoney(amount);
 }
 
 function price(amount: number): string {
-  return formatPrice(amount, "INR");
+  return formatPrice(amount);
 }
 
 function toneFor(value?: number): string {

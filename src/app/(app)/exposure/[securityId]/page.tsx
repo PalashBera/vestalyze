@@ -3,7 +3,6 @@
 import { use } from "react";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
-import { useSettings } from "@/components/settings-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { useAsync } from "@/hooks/use-async";
 import { api } from "@/lib/api/client";
-import { formatPercent, typeLabel } from "@/lib/format";
+import { formatMoney, formatPercent, typeLabel } from "@/lib/format";
 
 export default function ExposureDetailPage({
   params,
@@ -27,7 +26,6 @@ export default function ExposureDetailPage({
   params: Promise<{ securityId: string }>;
 }) {
   const { securityId } = use(params);
-  const { money, moneyNative } = useSettings();
   const { data, error, loading } = useAsync(() => api.portfolio.exposureDetail(securityId), [securityId]);
 
   if (loading) {
@@ -47,11 +45,11 @@ export default function ExposureDetailPage({
     <div className="flex flex-col gap-6">
       <PageHeader
         title={data.security.standardizedName}
-        description={data.security.country === "IN" ? "India" : "United States"}
+        description="Look-through exposure to this company across your holdings."
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard label="Total exposure" value={money(data.totalInvestedInr)} hint={`${formatPercent(data.portfolioPercentage)} of portfolio`} />
-        <StatCard label="Funds + ETFs" value={money(data.mutualFundInvestedInr + data.etfInvestedInr)} />
+        <StatCard label="Total exposure" value={formatMoney(data.totalInvestedInr)} hint={`${formatPercent(data.portfolioPercentage)} of portfolio`} />
+        <StatCard label="Funds + ETFs" value={formatMoney(data.mutualFundInvestedInr + data.etfInvestedInr)} />
       </div>
       <Card>
         <CardHeader>
@@ -72,7 +70,7 @@ export default function ExposureDetailPage({
                   },
                   {
                     label: "Effective invested",
-                    value: moneyNative(item.investedExposureNative, item.currency),
+                    value: formatMoney(item.investedExposureInr),
                   },
                 ]}
               />
@@ -99,7 +97,7 @@ export default function ExposureDetailPage({
                     {item.allocationPercentage ? formatPercent(item.allocationPercentage) : "100%"}
                   </TableCell>
                   <TableCell className="text-right">
-                    {moneyNative(item.investedExposureNative, item.currency)}
+                    {formatMoney(item.investedExposureInr)}
                   </TableCell>
                 </TableRow>
               ))}

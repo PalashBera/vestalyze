@@ -73,7 +73,7 @@ export default function HomePage() {
             <SectionHeading
               eyebrow="Contact"
               title="Still have a question?"
-              description="Ask about look-through, markets, or anything on the roadmap. This is a note to the team, not a mailing list."
+              description="Ask about look-through, fund sync, or anything on the roadmap. This is a note to the team, not a mailing list."
             />
             <div className="mx-auto w-full max-w-xl rounded-2xl border border-border/70 bg-card/40 p-6 md:p-8">
               <LandingContactForm />

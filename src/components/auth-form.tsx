@@ -64,7 +64,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             </h1>
             <p className="text-sm text-muted-foreground">
               {mode === "login"
-                ? "Access your consolidated India and US portfolio."
+                ? "Access your consolidated mutual fund and ETF portfolio."
                 : `Set up ${APP_NAME} with the holdings you already own.`}
             </p>
           </div>

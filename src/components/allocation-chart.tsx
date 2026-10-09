@@ -2,9 +2,9 @@
 
 import { Pie, PieChart } from "recharts";
 import type { AllocationSlice } from "@/lib/api/types";
-import { useSettings } from "@/components/settings-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { formatMoney } from "@/lib/format";
 
 const colors = [
   "var(--chart-1)",
@@ -23,7 +23,6 @@ export function AllocationChart({
   description: string;
   data: AllocationSlice[];
 }) {
-  const { money } = useSettings();
   const config = data.reduce<ChartConfig>((acc, item, index) => {
     acc[item.key] = { label: item.label, color: colors[index % colors.length] };
     return acc;
@@ -48,7 +47,7 @@ export function AllocationChart({
                   formatter={(value, name) => (
                     <div className="flex w-full items-center justify-between gap-4">
                       <span>{name}</span>
-                      <span>{money(Number(value))}</span>
+                      <span>{formatMoney(Number(value))}</span>
                     </div>
                   )}
                 />
